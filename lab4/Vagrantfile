@@ -1,0 +1,64 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+BOX_RAM = 2048
+BOX_CPU = 2
+DISKS = {
+  :sata1 => {
+      :size => 512, # Megabytes
+      :port => 1
+  },
+  :sata2 => {
+      :size => 512,
+      :port => 2
+  },
+  :sata3 => {
+      :size => 512,
+      :port => 3
+  },
+  :sata4 => {
+      :size => 512,
+      :port => 4
+  },
+  :sata5 => {
+      :size => 512,
+      :port => 5
+  },
+  :sata6 => {
+      :size => 512,
+      :port => 6
+  },
+  :sata7 => {
+      :size => 512,
+      :port => 7
+  },
+  :sata8 => {
+      :size => 512,
+      :port => 8
+  }
+}
+PROVISION = "install.sh"
+
+Vagrant.configure(2) do |config|
+  config.vm.define "rocky9" do |rk|
+    rk.vm.box = "rockylinux/9"
+    rk.vm.synced_folder ".", "/vagrant"
+    rk.vm.provider "virtualbox" do |vb|
+      vb.name = "rocky9-zfs"
+      vb.memory = BOX_RAM
+      vb.cpus = BOX_CPU
+      vb.customize ["storagectl", :id, "--name", "SATA Controller", "--add", "sata"]
+      DISKS.each do |dname, dconf|
+        unless File.exist?("disk-#{dconf[:port]}.vdi")
+          vb.customize [ "createmedium", "disk", "--filename", "disk-#{dconf[:port]}.vdi", "--format", "vdi", "--size", "#{dconf[:size]}"]
+        end
+        vb.customize [ "storageattach", :id, "--storagectl", "SATA Controller", "--port", "#{dconf[:port]}", "--device", 0, "--type", "hdd", "--medium", "disk-#{dconf[:port]}.vdi"]
+      end
+    end
+    # hostname виртуальной машины
+    rk.vm.hostname = "zfs-l4"
+    rk.vm.provision "shell",  path: PROVISION
+  end
+  if Vagrant.has_plugin?("vagrant-vbguest")
+    config.vbguest.auto_update = false  
+  end
+end

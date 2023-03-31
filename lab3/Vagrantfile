@@ -1,0 +1,45 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+BOX_RAM = 2048
+BOX_CPU = 2
+DISKS = {
+  :sata1 => {
+      :size => 10240,
+      :port => 1
+  },
+  :sata2 => {
+      :size => 2048, # Megabytes
+      :port => 2
+  },
+  :sata3 => {
+      :size => 1024, # Megabytes
+      :port => 3
+  },
+  :sata4 => {
+      :size => 1024,
+      :port => 4
+  }
+}
+
+Vagrant.configure(2) do |config|
+  config.vm.define "rocky9" do |rk|
+    rk.vm.box = "kgeor/rocky9-kernel6"
+    rk.vm.synced_folder ".", "/vagrant"
+    rk.vm.provider "virtualbox" do |vb|
+      vb.name = "rocky9-lvm"
+      vb.memory = BOX_RAM
+      vb.cpus = BOX_CPU
+      DISKS.each do |dname, dconf|
+        unless File.exist?("disk-#{dconf[:port]}.vdi")
+          vb.customize [ "createmedium", "disk", "--filename", "disk-#{dconf[:port]}.vdi", "--format", "vdi", "--size", "#{dconf[:size]}"]
+        end
+        vb.customize [ "storageattach", :id, "--storagectl", "SATA Controller", "--port", "#{dconf[:port]}", "--device", 0, "--type", "hdd", "--medium", "disk-#{dconf[:port]}.vdi"]
+      end
+    end
+    # hostname виртуальной машины
+    rk.vm.hostname = "lvm-l3"
+  end
+  if Vagrant.has_plugin?("vagrant-vbguest")
+    config.vbguest.auto_update = false  
+  end
+end
