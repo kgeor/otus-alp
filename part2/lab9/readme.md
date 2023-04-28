@@ -7,6 +7,16 @@
 В письме должен быть прописан обрабатываемый временной диапазон.
 
 grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' access.log | sort | uniq -c | sort -nr | grep -m 1 ""
-grep -Eo "\s\/[^[:space:]]*\s" access.log | sed 's/ //g' | sort | uniq -c | sort -nr | grep -m 1 ""  | awk '{print $1}'
-grep -e '\s4[0-9][0-9]\s' -ie 'error' access.log
+awk '{print $1}' access.log  | sort | uniq -c | sort -nr | grep -m 1 ""
+
+grep -Eo "\s\/[^[:space:]]*\s" access.log | sed 's/ //g' | sort | uniq -c | sort -nr | grep -m 3 ""
+
+grep -e '"\s5[0-9][0-9]\s' -ie 'error' access.log
 grep -Eo "\s[[:digit:]]{3}\s" access.log | sed 's/ //g' | sort | uniq -c | sort -nr
+
+read -r ...
+if []
+
+num=grep -n -m 1 -e "$(date "+%d/%b/%Y:%H" -d '@1565771957'):[0-9][0-9]:[0-9][0-9]" access.log | awk -F":" '{print $1}'
+197
+sed -n '$num,$p' access.log

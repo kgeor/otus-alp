@@ -1,0 +1,7 @@
+---
+- hosts: nginx
+  become: true
+  roles:
+   - nginx
+  vars:
+   - nginx_listen_port: 8080
