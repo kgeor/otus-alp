@@ -21,3 +21,5 @@
 - [Автоматизация администрирования. Ansible](./part2/lab11)
 
 - [Практика с SELinux](./part2/lab12)
+
+- [Docker](./part3/lab13)
