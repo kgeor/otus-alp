@@ -23,3 +23,7 @@
 - [Практика с SELinux](./part2/lab12)
 
 - [Docker](./part3/lab13)
+
+- [Prometheus](./part3/lab14)
+
+- [PAM](./part3/lab15)
