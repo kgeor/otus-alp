@@ -1,0 +1,13 @@
+---
+- hosts: all
+  become: true
+  roles:
+    - role: borg
+
+#- hosts: borg-server
+#  become: true
+#  roles:
+#    - role: borg
+#      tags:
+#        - general
+#        - server

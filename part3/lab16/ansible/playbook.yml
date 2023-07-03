@@ -1,0 +1,15 @@
+---
+- hosts: nginx
+  become: true
+  roles:
+    - nginx
+- hosts: log-server
+  become: true
+  roles:
+    - rsyslog
+#- hosts: elk
+#  become: true
+#  roles:
+#    - elastic
+#    - logstash
+#    - kibana

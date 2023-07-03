@@ -1,0 +1,5 @@
+---
+nginx_listen_port: 80
+log_server_port: 514
+log_server_ip: 10.0.5.10
+au_server_port: 60

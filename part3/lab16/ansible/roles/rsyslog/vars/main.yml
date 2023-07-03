@@ -1,0 +1,3 @@
+---
+rsyslog_port: 514
+au_server_port: 60

@@ -1,0 +1,35 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+BOX_RAM = 1024
+BOX_CPU = 2
+
+Vagrant.configure(2) do |config|
+  config.vm.box = "kgeor/rocky9-kernel6"
+  config.vm.synced_folder ".", "/vagrant"
+  config.vm.provider "virtualbox" do |vb|
+      vb.memory = BOX_RAM
+      vb.cpus = BOX_CPU
+  end
+  if Vagrant.has_plugin?("vagrant-vbguest")
+    config.vbguest.auto_update = false  
+  end
+  config.vm.define "log-server" do |server|
+    server.vm.hostname = "rocky9-log"
+    server.vm.provider "virtualbox" do |vb|
+      vb.memory = 2048
+    end
+    server.vm.network "private_network", virtualbox__intnet: "LAN", nic_type: "82545EM"
+    server.vm.provision "ansible" do |ansible|
+      ansible.playbook = "./ansible/playbook.yml"
+      ansible.limit = "log-server"
+    end
+  end
+  config.vm.define "nginx" do |client|
+    client.vm.hostname = "rocky9-web"
+    client.vm.network "private_network", virtualbox__intnet: "LAN", nic_type: "82545EM"
+    client.vm.provision "ansible" do |ansible|
+      ansible.playbook = "./ansible/playbook.yml"
+      ansible.limit = "nginx"
+    end
+  end 
+end

@@ -14,7 +14,7 @@ Vagrant.configure(2) do |config|
     config.vbguest.auto_update = false  
   end
   config.vm.define "rocky9" do |server|
-    server.vm.hostname = "rocky9"
-    #server.vm.provision "shell", path: "setup.sh"
+    server.vm.hostname = "rocky9-bash"
+    server.vm.provision "shell", path: "setup.sh", args: "<адрес отправителя> <smtp сервер> <адрес получателя>"
   end
 end

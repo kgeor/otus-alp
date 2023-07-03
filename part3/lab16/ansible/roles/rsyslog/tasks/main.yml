@@ -1,0 +1,90 @@
+---
+- name: Deleting default Ethernet connection with DHCP
+  community.general.nmcli:
+    conn_name: "Wired connection 1"
+    state: absent
+
+- name: Adding an Ethernet connection with static IP configuration
+  community.general.nmcli:
+    conn_name: enp0s8
+    ifname: enp0s8
+    type: ethernet
+    ip4: 10.0.5.10/24
+    state: present
+
+- name: Enabling UDP module in rsyslog config
+  ansible.builtin.replace:
+    path: /etc/rsyslog.conf
+    regexp: '^#module\(load="imudp"\)'
+    replace: 'module(load="imudp")'
+
+- name: Enabling UDP input in rsyslog config
+  ansible.builtin.lineinfile:
+    path: /etc/rsyslog.conf
+    regexp: '^#input\(type="imudp"'
+    line: input(type="imudp" port="{{ rsyslog_port }}")
+
+- name: Enabling TCP module in rsyslog config
+  ansible.builtin.lineinfile:
+    path: /etc/rsyslog.conf
+    regexp: '^\#module\(load="imtcp"\)'
+    line: 'module(load="imtcp")'
+
+- name: Enabling TCP input in rsyslog config
+  ansible.builtin.lineinfile:
+    path: /etc/rsyslog.conf
+    regexp: '^#input\(type="imtcp"'
+    line: 'input(type="imtcp" port="{{ rsyslog_port }}")'
+
+- name: Adding config in rsyslog config
+  ansible.builtin.lineinfile:
+    path: /etc/rsyslog.conf
+    line: "{{ item }}"
+  loop:
+    - '$template RemoteLogs,"/var/log/rsyslog/%HOSTNAME%/%PROGRAMNAME%.log"'
+    - '*.* ?RemoteLogs'
+    -  '& ~'
+  notify: 
+    - Restart rsyslog
+#- name: Adding config in rsyslog config
+#  ansible.builtin.lineinfile:
+#    path: /etc/rsyslog.conf
+#    line: '*.* ?RemoteLogs'
+#
+#- name: Adding config in rsyslog config
+#  ansible.builtin.lineinfile:
+#    path: /etc/rsyslog.conf
+#    line: '& ~'
+#  notify: 
+#    - Restart rsyslog
+
+- name: Creating firewall rule for rsyslog (TCP)
+  ansible.posix.firewalld:
+    port: "{{ rsyslog_port }}/tcp"
+    permanent: yes
+    immediate: yes
+    state: enabled
+
+- name: Creating firewall rule for rsyslog (UDP)
+  ansible.posix.firewalld:
+    port: "{{ rsyslog_port }}/udp"
+    permanent: yes
+    immediate: yes
+    state: enabled
+
+- name: Enabling TCP input in rsyslog config
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: '##tcp_listen_port'
+    line: 'tcp_listen_port = {{ au_server_port }}'
+  notify: 
+  - Restart auditd
+
+- name: Creating firewall rule for auditd
+  ansible.posix.firewalld:
+    port: "{{ au_server_port }}/tcp"
+    permanent: yes
+    immediate: yes
+    state: enabled
+
+

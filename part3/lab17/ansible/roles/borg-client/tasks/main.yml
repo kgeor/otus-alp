@@ -1,0 +1,67 @@
+---
+- name: Deleting default Ethernet connection with DHCP
+  community.general.nmcli:
+    conn_name: "Wired connection 1"
+    state: absent
+
+- name: Adding an Ethernet connection with static IP configuration
+  community.general.nmcli:
+    conn_name: enp0s8
+    ifname: enp0s8
+    type: ethernet
+    ip4: 10.0.5.11/24
+    state: present
+
+- name: Installing EPEL Repo package from standard repo
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+
+- name: Installing packages from standard repo
+  ansible.builtin.dnf:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - borgbackup
+
+- name: Creating directory .ssh
+  ansible.builtin.file:
+    path: /root/.ssh
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+#- name: Set file contexts for /root/.ssh/
+#  community.general.sefcontext:
+#    setype: ssh_home_t    
+#    target: /root/.ssh/
+#    state: present
+
+- name: Copying files with owner and permissions
+  ansible.builtin.copy:
+    src: files/{{ item }}
+    dest: /root/.ssh/{{ item }}
+    owner: root
+    group: root
+    mode: '0600'
+  loop:
+    - id_ed25519
+    - id_ed25519.pub
+
+#- name: Initializing repo
+#  ansible.builtin.shell: |
+#    BORG_REPO=10.0.5.10:{{ path | quote }}
+#    BORG_PASSPHRASE=0tu$
+#    export BORG_REPO
+#    export BORG_PASSPHRASE
+#    borg init --encryption=repokey
+#  args:
+#    executable: /bin/bash
+#  register: rp_out
+#
+#- name: Creating backup for /etc
+#  ansible.builtin.shell: "borg create --stats --list borg@192.168.56.10:{{ path }}::\"etc-{now:%Y-%m-%d_%H:%M:%S}\" /etc"
+#  args:
+#    executable: /bin/bash
+#  register: bkp_out

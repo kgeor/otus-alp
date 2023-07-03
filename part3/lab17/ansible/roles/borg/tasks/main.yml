@@ -1,0 +1,139 @@
+---
+# GENERAL config
+-  name: GENERAL config
+   tags: general
+   block:
+   - name: Deleting default Ethernet connection with DHCP
+     community.general.nmcli:
+       conn_name: "Wired connection 1"
+       state: absent
+   
+   - name: Adding an Ethernet connection with static IP configuration
+     community.general.nmcli:
+       conn_name: enp0s8
+       ifname: enp0s8
+       type: ethernet
+       ip4: "{{ ip_addr }}" #10.0.5.10/24
+       state: present
+   
+   - name: Installing EPEL Repo package from standard repo
+     ansible.builtin.dnf:
+       name: epel-release
+       state: present
+   
+# SERVER config
+-  name: SERVER config
+   tags: server
+   block:
+   - name: Installing packages from repo
+     ansible.builtin.dnf:
+       name: "{{ item }}"
+       state: present
+     loop:
+       - mkpasswd
+       - borgbackup   
+
+   - name: Creating a new ext4 partition for backup
+     community.general.parted:
+       device: /dev/sdb
+       label: gpt
+       number: 1
+       state: present   
+
+   - name: Formatting a new ext4 partition for backup
+     community.general.filesystem:
+       fstype: ext4
+       dev: /dev/sdb1   
+
+   - name: Mounting new partition in {{ path }}
+     ansible.posix.mount:
+       path: "{{ path }}"
+       src: /dev/sdb1
+       fstype: ext4
+       state: mounted   
+
+   - name: Generate password hash
+     ansible.builtin.shell: echo 'borg' | mkpasswd --method=sha-512 --stdin 
+     args:
+       executable: /bin/bash
+     register: crypted_pass   
+
+   - name: Creating user borg
+     ansible.builtin.user:
+       name: borg
+       #generate_ssh_key: yes
+       expires: -1
+       #home: "{{ path }}"
+       password: "{{ crypted_pass.stdout }}"
+       shell: /bin/bash
+       #ssh_key_bits: 2048
+       #ssh_key_file: .ssh/id_rsa   
+
+   - name: Changing bkp repo dir ownership
+     ansible.builtin.file:
+       path: "{{ path }}"
+       owner: borg
+       group: borg   
+
+   - name: Creating directory .ssh for user borg
+     ansible.builtin.file:
+       path: ~borg/.ssh
+       state: directory
+       owner: borg
+       group: borg
+       mode: '0700'   
+
+   - name: Set file context for .ssh/
+     community.general.sefcontext:
+       setype: ssh_home_t
+       target: "~borg/.ssh(/.*)?"
+       state: present   
+
+   #ansible.posix.authorized_key
+   - name: Apply new SELinux file context to filesystem
+     ansible.builtin.command: "restorecon -irv ~borg"   
+
+   - name: Getting client pub key
+     ansible.builtin.shell: cat /vagrant/ansible/files/id_ed25519.pub
+     args:
+       executable: /bin/bash
+     register: client_key   
+
+   - name: Adding client pub key to authorized keys
+     ansible.builtin.lineinfile:
+       path: ~borg/.ssh/authorized_keys
+       create: true
+       line: "command=\"/usr/bin/borg serve\" {{ client_key.stdout }}"
+       owner: borg
+       group: borg
+       mode: '0640'
+
+# CLIENT config 
+-  name: CLIENT config 
+   tags: client
+   block:
+   - name: Installing packages from repo
+     ansible.builtin.dnf:
+       name: "{{ item }}"
+       state: present
+     loop:
+       - borgbackup
+   
+   - name: Creating directory .ssh
+     ansible.builtin.file:
+       path: /root/.ssh
+       state: directory
+       owner: root
+       group: root
+       mode: '0700'
+
+   - name: Copying files with owner and permissions
+     ansible.builtin.copy:
+       src: files/{{ item }}
+       dest: /root/.ssh/{{ item }}
+       owner: root
+       group: root
+       mode: '0600'
+     loop:
+       - id_ed25519
+       - id_ed25519.pub

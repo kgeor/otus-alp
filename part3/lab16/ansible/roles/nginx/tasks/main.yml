@@ -1,0 +1,135 @@
+---
+- name: Deleting default Ethernet connection with DHCP
+  community.general.nmcli:
+    conn_name: "Wired connection 1"
+    state: absent
+
+- name: Adding an Ethernet connection with static IP configuration
+  community.general.nmcli:
+    conn_name: enp0s8
+    ifname: enp0s8
+    type: ethernet
+    ip4: 10.0.5.11/24
+    state: present
+
+- name: Setting timezone to Europe/Moscow
+  community.general.timezone:
+    name: Europe/Moscow
+  notify:
+  - Restart chronyd
+
+- name: Installing EPEL Repo package from standard repo
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+
+- name: Installing NGINX package from EPEL repo
+  ansible.builtin.dnf:
+    name: nginx
+    state: latest
+  notify:
+    - Enable nginx
+
+- name: Creating firewall rule for NGINX
+  ansible.posix.firewalld:
+    port: "{{ nginx_listen_port }}/tcp"
+    permanent: yes
+    immediate: yes
+    state: enabled
+
+- name: Setting permissions   
+  ansible.builtin.file:
+    path: /var/log/nginx
+    state: directory
+    recurse: yes
+    owner: nginx
+    group: nginx
+
+- name: Setting permissions   
+  ansible.builtin.file:
+    path: /etc/nginx
+    state: directory
+    recurse: yes
+    owner: nginx
+    group: nginx
+
+- name: Adding remote server config for NGINX error log
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/nginx.conf 
+    insertafter: '^error_log'
+    line: 'error_log syslog:server={{ log_server_ip }}:{{ log_server_port }},tag=nginx_error;'
+
+- name: Adding remote server config for NGINX access log
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/nginx.conf 
+    insertafter: 'access_log'
+    line: '    access_log syslog:server={{ log_server_ip }}:{{ log_server_port }},tag=nginx_access,severity=info combined;'
+  notify:
+    - Restart nginx
+
+#- name: Flush handlers
+#  meta: flush_handlers
+#
+#- name: Making query to generate NGINX access log
+#  command: curl localhost:80
+
+- name: Installing audit package
+  ansible.builtin.dnf:
+    name: audit
+    state: present
+
+- name: Modifying audit config, adding rule for nginx.conf
+  ansible.builtin.lineinfile:
+    path: /etc/audit/rules.d/audit.rules 
+    line: "{{ item }}"
+  loop:
+    - '-w /etc/nginx/nginx.conf -p wa -k nginx_conf'
+    - '-w /etc/nginx/default.d/ -p wa -k nginx_conf'
+# notify:
+#   - Restart auditd
+
+#- name: Modifying audit config, adding rule for nginx default.d
+#  ansible.builtin.lineinfile:
+#    path: /etc/audit/rules.d/audit.rules 
+#    line: '-w /etc/nginx/default.d/ -p wa -k nginx_conf'
+#  notify:
+#  - Restart auditd
+  
+- name: Installing audispd-plugins for auditd
+  ansible.builtin.dnf:
+    name: audispd-plugins
+    state: present
+
+- name: Setting log format for auditd
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: '^log_format'
+    line: 'log_format = RAW'
+
+- name: Setting name format for auditd
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: '^name_format'
+    line: 'name_format = HOSTNAME'
+
+- name: Enabling auditd au-remote plugin
+  ansible.builtin.lineinfile:
+    path: /etc/audit/plugins.d/au-remote.conf
+    regexp: 'active'
+    line: 'active = yes'
+
+- name: Setting remote server IP for audisp-remote
+  ansible.builtin.lineinfile:
+    path: /etc/audit/audisp-remote.conf
+    regexp: 'remote_server'
+    line: 'remote_server = {{ log_server_ip }}'
+#  notify:
+#    - Restart auditd
+
+- name: Setting remote server port for audisp-remote
+  lineinfile:
+    path: /etc/audit/audisp-remote.conf
+    regexp: 'port'
+    line: 'port = {{ au_server_port }}'
+  notify:
+    - Restart auditd

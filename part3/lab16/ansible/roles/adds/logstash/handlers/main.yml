@@ -1,0 +1,12 @@
+---
+- name: restart elastic
+  systemd:
+   name: elastic
+   state: restarted
+   enabled: yes
+   
+- name: restart kibana
+  systemd:
+   name: kibana
+   state: restarted
+   enabled: yes
