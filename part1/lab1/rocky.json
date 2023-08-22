@@ -2,11 +2,11 @@
   "name": "kgeor/rocky9-kernel6",
   "versions": [
     {
-      "version": "1.3",
+      "version": "1.5",
       "providers": [
         {
           "name": "virtualbox",
-          "url": "file:///home/kgeor/labs/lab1/packer/Rocky9.1-x86_64-base.box"
+          "url": "file:///home/kgeor/labs/part1/lab1/packer/Rocky9.2-x86_64-base.box"
         }
       ]
     }

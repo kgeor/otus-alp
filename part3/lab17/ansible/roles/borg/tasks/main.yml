@@ -1,26 +1,4 @@
 ---
-# GENERAL config
--  name: GENERAL config
-   tags: general
-   block:
-   - name: Deleting default Ethernet connection with DHCP
-     community.general.nmcli:
-       conn_name: "Wired connection 1"
-       state: absent
-   
-   - name: Adding an Ethernet connection with static IP configuration
-     community.general.nmcli:
-       conn_name: enp0s8
-       ifname: enp0s8
-       type: ethernet
-       ip4: "{{ ip_addr }}" #10.0.5.10/24
-       state: present
-   
-   - name: Installing EPEL Repo package from standard repo
-     ansible.builtin.dnf:
-       name: epel-release
-       state: present
-   
 # SERVER config
 -  name: SERVER config
    tags: server
@@ -90,8 +68,8 @@
        state: present   
 
    #ansible.posix.authorized_key
-   - name: Apply new SELinux file context to filesystem
-     ansible.builtin.command: "restorecon -irv ~borg"   
+   #- name: Apply new SELinux file context to filesystem
+   #  ansible.builtin.command: "restorecon -irv ~borg"   
 
    - name: Getting client pub key
      ansible.builtin.shell: cat /vagrant/ansible/files/id_ed25519.pub

@@ -30,7 +30,7 @@ Vagrant.configure(2) do |config|
       ansible.host_vars = {
         "borg-server" => { "ip_addr" => "10.0.5.10/24"}
       }
-      ansible.raw_arguments = ["--tags=general,server"]
+      ansible.raw_arguments = ["--tags=untagged,server"]
       ansible.compatibility_mode = "2.0"
     end
   end
@@ -45,7 +45,7 @@ Vagrant.configure(2) do |config|
       ansible.host_vars = {
         "borg-client" => {"ip_addr" => "10.0.5.11/24"}
       }
-      ansible.raw_arguments = ["--tags=general,client"]
+      ansible.raw_arguments = ["--tags=untagged,client"]
       ansible.compatibility_mode = "2.0"
     end
   end 

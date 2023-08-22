@@ -1,7 +1,7 @@
-sed -i 's/# use_devicesfile = 0/use_devicesfile = 0/' /etc/lvm/lvm.conf
+#sed -i 's/# use_devicesfile = 0/use_devicesfile = 0/' /etc/lvm/lvm.conf
 dnf -y install https://www.elrepo.org/elrepo-release-9.el9.elrepo.noarch.rpm 
 dnf config-manager --set-enabled elrepo-kernel
-dnf -y install kernel-ml
+dnf -y install kernel-lt
 #grub2-mkconfig -o /boot/grub2/grub.cfg
 #grub2-set-default 0
 mkdir -pm 700 /home/vagrant/.ssh

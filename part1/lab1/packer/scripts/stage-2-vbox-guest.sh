@@ -1,6 +1,8 @@
 dnf -y install epel-release
 dnf -y remove kernel kernel-{core,modules,tools}
-dnf -y install kernel-ml-devel gcc make bzip2 perl dkms elfutils-libelf-devel
+dnf -y install kernel-lt-devel gcc make bzip2 perl dkms elfutils-libelf-devel
+dnf -y upgrade
+sleep 1
 dnf -y upgrade
 echo "System upgrade done"
 echo "==================="
@@ -12,17 +14,6 @@ echo "========================================="
 ./VBoxLinuxAdditions.run
 cd ~
 umount /tmp/vboxguest
-echo "Starting cleanup"
-echo "================"
-rm -rf /tmp/vboxguest
-dnf clean all
-rm -rf /home/vagrant/VBoxGuestAdditions*.iso
-rm -rf /tmp/*
-rm  -f /var/log/wtmp /var/log/btmp
-rm -rf /var/cache/* /usr/share/doc/*
-rm -rf /var/cache/yum
-rm -rf /vagrant/*
-rm  -f ~/.bash_history
-history -c
-rm -rf /run/log/journal/*
-sync
+dnf config-manager --set-disabled elrepo-kernel
+dracut -f -v
+reboot now

@@ -3,6 +3,3 @@
 #  service:
 #    name: rsyslog
 #    state: restarted
-#
-#- name: Restart auditd
-#  command: service auditd restart

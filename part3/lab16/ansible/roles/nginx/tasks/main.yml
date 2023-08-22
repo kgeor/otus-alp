@@ -1,17 +1,4 @@
 ---
-- name: Deleting default Ethernet connection with DHCP
-  community.general.nmcli:
-    conn_name: "Wired connection 1"
-    state: absent
-
-- name: Adding an Ethernet connection with static IP configuration
-  community.general.nmcli:
-    conn_name: enp0s8
-    ifname: enp0s8
-    type: ethernet
-    ip4: 10.0.5.11/24
-    state: present
-
 - name: Setting timezone to Europe/Moscow
   community.general.timezone:
     name: Europe/Moscow

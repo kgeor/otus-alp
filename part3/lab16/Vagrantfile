@@ -18,18 +18,24 @@ Vagrant.configure(2) do |config|
     server.vm.provider "virtualbox" do |vb|
       vb.memory = 2048
     end
-    server.vm.network "private_network", virtualbox__intnet: "LAN", nic_type: "82545EM"
+    server.vm.network "private_network", virtualbox__intnet: "LAN", auto_config: false
     server.vm.provision "ansible" do |ansible|
       ansible.playbook = "./ansible/playbook.yml"
-      ansible.limit = "log-server"
+      ansible.host_vars = {
+        "log-server" => { "ip_addr" => "10.0.5.10/24"}
+      }
+      ansible.compatibility_mode = "2.0"
     end
   end
   config.vm.define "nginx" do |client|
     client.vm.hostname = "rocky9-web"
-    client.vm.network "private_network", virtualbox__intnet: "LAN", nic_type: "82545EM"
+    client.vm.network "private_network", virtualbox__intnet: "LAN", auto_config: false
     client.vm.provision "ansible" do |ansible|
       ansible.playbook = "./ansible/playbook.yml"
-      ansible.limit = "nginx"
+      ansible.host_vars = {
+        "nginx" => { "ip_addr" => "10.0.5.11/24"}
+      }
+      ansible.compatibility_mode = "2.0"
     end
   end 
 end

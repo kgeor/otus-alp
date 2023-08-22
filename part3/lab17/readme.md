@@ -1,11 +1,17 @@
 # Резервное копирование
 ## Создание бэкапа вручную
 На клиенте и сервере уже  установлен `borgbackup`, добавлен ключ клиента
-
-Инициализируем репозиторий
+Зайдем на клиент `vagrant ssh borg-client`
+Инициализируем репозиторий (здесь и далее все делается под пользователем `root`)
 ```
 [root@rocky9-borg-client ~]# borg init --encryption=repokey borg@10.0.5.10:/var/backup/borg_repo
+The authenticity of host '10.0.5.10 (10.0.5.10)' can't be established.
+ED25519 key fingerprint is SHA256:7NPvz5lYyqfI0HM1Mo1FZDOKLaIsf4RZi9iPa6sNPb0.
+This key is not known by any other names
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Remote: Warning: Permanently added '10.0.5.10' (ED25519) to the list of known hosts.
 Enter new passphrase:
+otus
 ...
 ```
 Создадим первый бэкап
@@ -74,7 +80,7 @@ ${BACKUP_TARGET}
 ExecStart=/usr/bin/borg check ${REPO}
 
 # Очистка старых бэкапов
-ExecStart=/usr/bin/borg prune --keep-hourly 10 --keep-daily 90 \
+ExecStart=/usr/bin/borg prune --keep-daily 90 \
 --keep-monthly 12 --keep-yearly 1 ${REPO}
 EOF
 
@@ -83,16 +89,17 @@ cat > /etc/systemd/system/borg-backup.timer << 'EOF'
 Description=Borg Backup
 
 [Timer]
-OnUnitActiveSec=5min
+OnBootSec=5m
+OnUnitActiveSec=5m
 
 [Install]
 WantedBy=timers.target
 EOF
 ```
-Запусти сервис и проверим работоспособность, а также логирование (стандартное для сервисов systemd)
+Запустим сервис и проверим работоспособность, а также логирование (стандартное для сервисов systemd)
 ```
 [root@rocky9-borg-client ~]# systemctl daemon-reload
-[root@rocky9-borg-client ~]# systemctl enable borg-backup.timer
+[root@rocky9-borg-client ~]# systemctl enable --now borg-backup.timer
 [root@rocky9-borg-client ~]# borg list borg@10.0.5.10:/var/backup/borg_repo
 Enter passphrase for key ssh://borg@10.0.5.10/var/backup/borg_repo:
 etc-2023-06-29_16:42:50              Thu, 2023-06-29 16:42:54 [6d3efc6246aaa199dbc529d62e955f01d1a82c3696008dbe101ace58d74962c7]

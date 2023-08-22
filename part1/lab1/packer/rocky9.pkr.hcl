@@ -1,10 +1,10 @@
 variable "artifact_description" {
   type    = string
-  default = "Rocky 9.1 with 6.x kernel"
+  default = "Rocky 9.2 with 6.x kernel"
 }
 variable "artifact_version" {
   type    = string
-  default = "9.1"
+  default = "9.2"
 }
 variable "headless" {
   type    = string
@@ -16,11 +16,11 @@ variable "shutdown_command" {
 }
 variable "iso_url" {
   type = string
-  default = "file:///home/kgeor/Downloads/Rocky-9.1-x86_64-minimal.iso"
+  default = "file:///home/kgeor/Downloads/Rocky-9.2-x86_64-minimal.iso"
 }
 variable "iso_checksum" {
   type = string
-  default = "bae6eeda84ecdc32eb7113522e3cd619f7c8fc3504cb024707294e3c54e58b40"
+  default = "06505828e8d5d052b477af5ce62e50b938021f5c28142a327d4d5c075f0670dc"
 }
 variable "output_directory" {
   type = string
@@ -36,7 +36,7 @@ source "virtualbox-iso" "virtualbox" {
   "--description", "${var.artifact_description}",
   "--version", "${var.artifact_version}"
   ]
-  guest_os_type         = "RedHat_64"
+  guest_os_type         = "RedHat9_64"
   hard_drive_interface  = "sata"
   headless              = "${var.headless}"
   http_directory        = "http"
@@ -57,7 +57,7 @@ source "virtualbox-iso" "virtualbox" {
     [ "modifyvm", "{{ .Name }}", "--vram", "16"],
     [ "modifyvm", "{{ .Name }}", "--nictype1", "82545EM"]
   ]
-  vm_name               = "rocky9-packer"
+  vm_name               = "Rocky9-packer"
 }
 
 build {
@@ -65,12 +65,18 @@ build {
   provisioner "shell" {
     execute_command     = "sudo {{ .Vars }} bash {{ .Path }}"
     expect_disconnect   = "true"
-    pause_after         = "30s"
+    pause_after         = "20s"
     scripts             = ["scripts/stage-1-update.sh"]
   }
   provisioner "shell" {
     execute_command     = "sudo {{ .Vars }} bash {{ .Path }}"
+    expect_disconnect   = "true"
+    pause_after         = "20s"
     scripts             = ["scripts/stage-2-vbox-guest.sh"]
+  }
+  provisioner "shell" {
+    execute_command     = "sudo {{ .Vars }} bash {{ .Path }}"
+    scripts             = ["scripts/stage-3-cleanup.sh"]
   }
 
   post-processor "vagrant" {
