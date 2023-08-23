@@ -1,0 +1,171 @@
+---
+- name: Install EPEL Repo package from standard repo
+  dnf:
+    name: epel-release
+    state: present
+
+- name: Install needed packages from repo
+  dnf:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - dhcp-server
+    - tftp-server
+    - nginx
+    - syslinux
+
+- name: Check ISO image is exists
+  ansible.builtin.stat:
+    path: "/vagrant/ansible/roles/pxe-server/files/{{ image }}"
+  register: st
+
+- name: Download ISO image...
+  ansible.builtin.get_url: 
+    url: "{{url}}"
+    dest: /vagrant/ansible/roles/pxe-server/files/
+  when: st.stat.exists == False
+
+- name: Create ISO directory
+  ansible.builtin.file:
+    path: /iso/rocky9
+    state: directory
+    mode: '0755'
+
+- name: Set file context for /iso
+  community.general.sefcontext:
+    setype: httpd_sys_content_t
+    target: "/iso(/.*)?"
+    state: present
+
+- name: Mount ISO image
+  ansible.posix.mount:
+    path: /mnt
+    src: "/vagrant/ansible/roles/pxe-server/files/{{ image }}"
+    fstype: iso9660
+    opts: ro,loop
+    state: mounted
+
+- name: Copy all files from /mnt to /iso
+  copy:
+    src: /mnt/
+    dest: /iso/rocky9
+    remote_src: yes 
+    directory_mode: yes
+
+- name: Apply new SELinux file context to filesystem
+  ansible.builtin.command: "restorecon -irv /iso"   
+
+- name: Set up web server config
+  ansible.builtin.copy:
+    #src: roles/pxe-server/files/pxeboot.conf
+    #dest: /etc/httpd/conf.d/pxeboot.conf
+    src: roles/pxe-server/files/pxe.conf
+    dest: /etc/nginx/default.d/
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Copy DHCP server config 
+  ansible.builtin.copy:
+    src: roles/pxe-server/files/dhcpd.conf
+    dest: /etc/dhcp/dhcpd.conf
+    owner: root
+    group: root
+    mode: 0640
+  notify: Restart dhcp
+
+- name: Create directory for tftp pxelinux
+  ansible.builtin.file:
+    path: /var/lib/tftpboot/pxelinux.cfg
+    state: directory
+    mode: '0755'
+
+- name: Copy files for tftp boot
+  ansible.builtin.copy:
+    src: /usr/share/syslinux/{{ item }}
+    dest: /var/lib/tftpboot/
+    remote_src: true
+  loop:   
+    - pxelinux.0
+    - ldlinux.c32
+    - libcom32.c32
+    - libutil.c32
+    - menu.c32
+    #- vesamenu.c32
+
+- name: Set up pxelinux
+  template:
+    src: roles/pxe-server/files/default
+    dest: /var/lib/tftpboot/pxelinux.cfg/
+
+- name: Create directory for tftp boot image
+  ansible.builtin.file:
+    path: /var/lib/tftpboot/rockylinux9
+    state: directory
+    mode: '0755'
+
+- name: Copy initrd and vmlinuz to tftp boot dir
+  ansible.builtin.copy:
+    src: "/iso/rocky9/images/pxeboot/{{ item }}"
+    dest: /var/lib/tftpboot/rockylinux9/
+    remote_src: true
+  loop:
+    - initrd.img
+    - vmlinuz
+
+- name: Copy bootloader config
+  ansible.builtin.copy:
+    src: roles/pxe-server/files/grub.cfg
+    dest: /var/lib/tftpboot/rockylinux9/
+
+- name: Extract needed PXE boot files
+  ansible.builtin.shell: "rpm2cpio /iso/rocky9/minimal/Packages/{{ item }} | cpio -idm"
+  args:
+    executable: /bin/bash
+  loop:
+    - grub2-efi-x64-2.06-61.el9.rocky.0.1.x86_64.rpm
+    - shim-x64-15.6-1.el9.rocky.0.2.x86_64.rpm
+#- name: Creating directory for PXE boot files
+#  ansible.builtin.file:
+#    path: /var/lib/tftpboot/pxelinux
+#    state: directory
+#    mode: '0755'
+
+- name: Copy needed PXE boot files
+  ansible.builtin.copy:
+    src: "boot/efi/EFI/{{item}}"
+    dest: /var/lib/tftpboot/rockylinux9/
+    remote_src: yes
+  loop:
+    - BOOT/BOOTX64.EFI
+    - rocky/shimx64.efi
+    - rocky/grubx64.efi
+  notify: Restart tftp
+
+- name: Create ks directory
+  ansible.builtin.file:
+    path: /usr/share/nginx/html/ks
+    state: directory
+    mode: '0755'
+
+- name: Copy ks file
+  ansible.builtin.copy:
+    src: roles/pxe-server/files/rocky9-ks.cfg
+    dest: /usr/share/nginx/html/ks
+  notify: Restart nginx
+
+- name: Permit traffic in default zone firewalld
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - dhcp
+    - tftp
+    - http
+    #- 69/udp
+    #- 80/tcp
+#parted /dev/sdb mklabel gpt
+#parted /dev/sdb mkpart primary ext4 0% 100%
+#echo "/dev/sdb /var/backup ext4 defaults 0 0" >> /etc/fstab

@@ -1,0 +1,154 @@
+---
+- hosts: 
+  - inetRouter1
+  - inetRouter2
+  become: true
+
+  pre_tasks:
+    - name: Delete default Ethernet connection for adapter 2
+      community.general.nmcli:
+        conn_name: "Wired connection 1"
+        state: absent
+    
+    - name: Add Ethernet connection for adapter 2
+      community.general.nmcli:
+        conn_name: enp0s8
+        ifname: enp0s8
+        type: ethernet
+        ip4: "{{ ip_addr }}"
+        routes4:
+          - "10.0.5.0/24 {{ ip_LAN_gw }}"
+        state: present
+      notify:
+        - reload network config
+  handlers:
+    - name: reload network config
+      ansible.builtin.shell: nmcli connection reload
+  roles:
+    - firewall
+
+- hosts: centralRouter
+  become: true
+  tasks:
+    - name: Set no default route on DHCP Ethernet connection
+      community.general.nmcli:
+        conn_name: enp0s17
+        ifname: enp0s17
+        type: ethernet
+        #method4: "auto"
+        #ip4: "{{ ansible_default_ipv4.address}}/{{ ansible_default_ipv4.prefix }}"
+        gw4_ignore_auto: true
+        #never_default4 : true
+        state: present
+      notify:
+        - reactivate connection
+    
+    - name: Delete default Ethernet connections
+      community.general.nmcli:
+        conn_name: "Wired connection {{ item }}"
+        state: absent
+      loop: [1, 2, 3]
+    
+    - name: Add Ethernet connection for all adapters
+      community.general.nmcli:
+        conn_name: "{{ item.conn }}"
+        ifname: "{{ item.conn }}"
+        type: ethernet
+        ip4: "{{ item.ip }}"
+        state: present
+      loop:
+        - { conn: enp0s8, ip: "{{ ip_addr_R1 }}" }
+        - { conn: enp0s9, ip: "{{ ip_addr_R2 }}" }
+        - { conn: enp0s10, ip: "{{ ip_addr_LAN }}" }
+      notify:
+      - restart NetworkManager 
+
+    - name: Add an default route
+      community.general.nmcli:
+        conn_name: enp0s8
+        gw4: "{{ ip_R1 }}"
+        #routes4:
+        #  - "0.0.0.0/0 {{ ip_R1 }}"
+        state: present
+
+    - name: Enable IP forwarding
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_set: true
+        state: present
+        reload: true
+
+    - name: Install EPEL Repo package from standard repo
+      ansible.builtin.dnf:
+        name: epel-release
+        state: latest
+      
+    - name: Install knockd
+      ansible.builtin.dnf:
+        name: knock
+        state: latest
+
+  handlers:
+    - name: reactivate connection
+      ansible.builtin.shell: nmcli conn up enp0s17
+
+    - name: restart NetworkManager 
+      ansible.builtin.service: 
+        name: NetworkManager
+        state: restarted
+    
+
+- hosts: nginx
+  become: true
+
+  pre_tasks:
+    - name: Set no default route on DHCP Ethernet connection
+      community.general.nmcli:
+        conn_name: enp0s17
+        gw4_ignore_auto: true
+        #ifname: enp0s17
+        type: ethernet
+        #ip4: "{{ ansible_default_ipv4.address}}/{{ ansible_default_ipv4.prefix }}"
+        #never_default4: true
+        state: present
+      notify:
+        - reactivate connection
+
+    - name: Delete default Ethernet connection for adapter 2
+      community.general.nmcli:
+        conn_name: "Wired connection 1"
+        state: absent
+    
+    - name: Add Ethernet connection for adapter 2
+      community.general.nmcli:
+        conn_name: enp0s8
+        ifname: enp0s8
+        type: ethernet
+        ip4: "{{ ip_addr }}"
+        gw4: "{{ ip_gw }}"
+        #routes4:
+        #  - "0.0.0.0/0 {{ ip_gw }}"
+        state: present
+      notify:
+        - restart NetworkManager
+
+    #- name: Add default route
+    #  community.general.nmcli:
+    #    conn_name: enp0s8
+    #    routes4:
+    #      - "0.0.0.0/0 {{ ip_gw }}"
+    #    state: present
+    #  notify:
+    #    - restart NetworkManager
+
+  handlers:
+    - name: reactivate connection
+      ansible.builtin.shell: nmcli conn up enp0s17
+
+    - name: restart NetworkManager 
+      ansible.builtin.service: 
+        name: NetworkManager
+        state: restarted
+  roles:
+    - nginx

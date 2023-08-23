@@ -1,0 +1,45 @@
+---
+- name: Set timezone to Europe/Moscow
+  community.general.timezone:
+    name: Europe/Moscow
+  notify:
+  - Restart chronyd
+
+- name: Install EPEL Repo package from standard repo
+  ansible.builtin.dnf:
+    name: epel-release
+    state: latest
+
+- name: Install NGINX package from EPEL repo
+  ansible.builtin.dnf:
+    name: "{{ item }}"
+    state: latest
+  loop:
+    - nginx
+  notify:
+    - Enable nginx
+
+- name: Create firewall rule for NGINX
+  ansible.posix.firewalld:
+    port: "{{ nginx_port }}/tcp"
+    permanent: yes
+    immediate: yes
+    state: enabled
+
+- name: Set permissions   
+  ansible.builtin.file:
+    path: /var/log/nginx
+    state: directory
+    recurse: yes
+    owner: nginx
+    group: nginx
+
+- name: Set permissions   
+  ansible.builtin.file:
+    path: /etc/nginx
+    state: directory
+    recurse: yes
+    owner: nginx
+    group: nginx
+  notify:
+    - Restart nginx

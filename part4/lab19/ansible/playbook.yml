@@ -1,0 +1,22 @@
+---
+- hosts: pxe-server
+  become: true
+  tasks:
+    - name: Delete default Ethernet connection with DHCP
+      community.general.nmcli:
+        conn_name: "Wired connection 1"
+        state: absent
+
+    - name: Add Ethernet connection with static IP
+      community.general.nmcli:
+        conn_name: enp0s8
+        ifname: enp0s8
+        type: ethernet
+        ip4: 10.0.5.20/24
+        state: present
+      notify: Reload network config
+  handlers:
+    - name: Reload network config
+      ansible.builtin.shell: nmcli connection reload
+  roles:
+    - pxe-server

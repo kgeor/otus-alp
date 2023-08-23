@@ -1,0 +1,137 @@
+---
+- name: Set up common config
+  #tags: always
+  block:
+  - name: Enabling IP forwarding
+    ansible.posix.sysctl:
+      name: net.ipv4.ip_forward
+      value: '1'
+      sysctl_set: true
+      state: present
+      reload: true
+ 
+  - name: Remove LAN iface from public (WAN) zone   
+    ansible.posix.firewalld:
+      interface: enp0s8
+      zone: public
+      state: disabled
+      permanent: true
+      immediate: true
+
+  #- name: Checking WAN iface in public (WAN) zone   
+  #  ansible.posix.firewalld:
+  #    interface: enp0s17
+  #    zone: public
+  #    state: enabled
+  #    permanent: true
+  #    immediate: true
+
+  - name: Add LAN iface to internal (LAN) zone   
+    ansible.posix.firewalld:
+      interface: enp0s8
+      zone: internal
+      state: enabled
+      permanent: true
+      immediate: true
+    notify:
+      - reload network config
+
+  - ansible.builtin.meta: flush_handlers
+
+- name: Set up inetRouter1 config
+  tags: inetRouter1
+  block:
+  - name: Enabling NAT in public (WAN) zone
+    ansible.posix.firewalld:
+      masquerade: true
+      state: enabled
+      zone: public
+      permanent: true
+      immediate: true
+
+  - name: Disable SSH in internal (LAN) zone (only by knock-knock)
+    ansible.posix.firewalld:
+      service: ssh
+      state: disabled
+      zone: internal
+      permanent: true
+      immediate: true
+  #  notify: 
+  #    - save firewalld config
+  #
+  #- ansible.builtin.meta: flush_handlers
+  
+  - name: Create NAT policy
+    ansible.builtin.shell: "{{ item }}"
+    args:
+      executable: /bin/bash
+    loop:
+      - firewall-cmd --info-policy=NAT_int_to_ext || firewall-cmd --new-policy NAT_int_to_ext --permanent
+      - firewall-cmd --permanent --policy NAT_int_to_ext --add-ingress-zone internal
+      - firewall-cmd --permanent --policy NAT_int_to_ext --add-egress-zone public
+      - firewall-cmd --permanent --policy NAT_int_to_ext --set-target ACCEPT
+
+  - name: Install EPEL Repo package from standard repo
+    ansible.builtin.dnf:
+      name: epel-release
+      state: latest
+    
+  - name: Install knockd
+    ansible.builtin.dnf:
+      name: knock-server
+      state: latest
+    
+  - name: Copy knockd .conf file
+    ansible.builtin.template:
+      src: roles/firewall/templates/knockd.conf.j2
+      dest: /etc/knockd.conf
+    notify: restart knockd
+  
+  - name: Set knockd defaults
+    ansible.builtin.lineinfile:
+      path: /etc/sysconfig/knockd
+      regexp: '^#OPTIONS'
+      line: OPTIONS="-i enp0s8"
+    notify: restart knockd
+
+  notify:
+    - save firewalld config
+    - reload firewalld
+
+- name: Set up inetRouter2 config
+  tags: inetRouter2
+  block:
+  #- name: Stopping firewalld
+  #  ansible.builtin.service: 
+  #    name: firewalld
+  #    state: stopped
+  - name: Enable NAT in internal (LAN) zone
+    ansible.posix.firewalld:
+      masquerade: true
+      state: enabled
+      zone: internal
+      permanent: true
+      immediate: true
+
+  - name: Add port forward (dst-nat) rule in internal (LAN) zone
+    ansible.posix.firewalld:
+      zone: internal
+      permanent: true
+      immediate: true
+      port_forward: 
+        - port: 8080
+          proto: tcp
+          toaddr: "{{ ip_server }}"
+          toport: 80
+      state: enabled
+
+  - name: Add source IP in internal (LAN) zone
+    ansible.posix.firewalld:
+      source: 10.0.2.0/24
+      zone: internal
+      permanent: true
+      immediate: true
+      state: enabled
+
+  #notify: 
+  #  - restart firewalld

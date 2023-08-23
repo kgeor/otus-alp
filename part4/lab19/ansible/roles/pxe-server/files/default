@@ -1,0 +1,25 @@
+default menu.c32
+prompt 0
+timeout 150
+#Параметр использования локального времени
+ONTIME local
+#Имя «шапки» нашего меню
+menu title OTUS PXE Boot Menu
+       #Описание первой строки
+       label 1
+       #Имя, отображаемое в первой строке
+       menu label ^ Graph install Rocky 9.2
+       #Адрес ядра, расположенного на TFTP-сервере
+       kernel rockylinux9/vmlinuz
+       #Адрес файла initrd, расположенного на TFTP-сервере и указываем адрес веб-сервера
+       append initrd=rockylinux9/initrd.img ip=enp0s8:dhcp inst.repo=http://10.0.5.20/pxe/rocky9 inst.ks=http://10.0.5.20/ks/rocky9-ks.cfg
+       label 2
+       menu label ^ Text install Rocky 9.2
+       kernel /rockylinux9/vmlinuz
+       initrd /rockylinux9/initrd.img
+       append inst.repo=http://10.0.5.20/pxe/rocky9 inst.ks=http://10.0.5.20/pxe/ks/rocky9-ks.cfg text
+       label 3
+       menu label ^ rescue installed system
+       kernel /rockylinux9/vmlinuz
+       initrd /rockylinux9/initrd.img
+       append ip=enp0s8:dhcp inst.repo=http://10.0.5.20/pxe/rocky9 inst.ks=http://10.0.5.20/pxe/ks/rocky9-ks.cfg rescue

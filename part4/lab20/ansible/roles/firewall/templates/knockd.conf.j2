@@ -1,0 +1,9 @@
+[options]
+	logfile = /var/log/knockd.log
+[opencloseSSH]
+	sequence      = 2222:udp,3333:tcp,20000:udp
+	seq_timeout   = 10
+	tcpflags      = syn
+	start_command = /usr/bin/firewall-cmd --zone=internal --add-rich-rule 'rule family="ipv4" source address="{{ ip_LAN_gw }}/32" service name="ssh" accept'
+	cmd_timeout   = 30
+	stop_command  = /usr/bin/firewall-cmd --zone=internal --remove-rich-rule 'rule family="ipv4" source address="{{ ip_LAN_gw }}/32" service name="ssh" accept'

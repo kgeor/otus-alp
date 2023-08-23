@@ -1,0 +1,61 @@
+- name: Delete default Ethernet connection for adapters
+  community.general.nmcli:
+    conn_name: "Wired connection {{ item }}"
+    state: absent
+  loop: [1, 2]
+
+- name: Add Ethernet connection for adapter 2
+  community.general.nmcli:
+    conn_name: enp0s8
+    ifname: enp0s8
+    type: ethernet
+    ip4: "{{ ip_addr }}"
+    routes4:
+      - "192.168.0.0/28 {{ ip_nh_cr }}"
+      - "192.168.0.32/28 {{ ip_nh_cr }}"
+      - "192.168.0.64/26 {{ ip_nh_cr }}"
+      - "192.168.2.0/26 {{ ip_nh_cr }}"
+      - "192.168.2.64/26 {{ ip_nh_cr }}"
+      - "192.168.2.128/26 {{ ip_nh_cr }}"
+      - "192.168.2.192/26 {{ ip_nh_cr }}"
+      - "192.168.1.0/25 {{ ip_nh_cr }}"
+      - "192.168.1.128/26 {{ ip_nh_cr }}"
+      - "192.168.1.192/26 {{ ip_nh_cr }}"
+      - "192.168.255.4/30 {{ ip_nh_cr }}"
+      - "192.168.255.8/30 {{ ip_nh_cr }}"
+    state: present
+  notify:
+    - restart NetworkManager
+
+- name: Enable IP forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: true
+    state: present
+    reload: true
+
+- name: Disable firewalld service
+  ansible.builtin.systemd:
+    name: firewalld
+    enabled: false
+    state: stopped
+
+- name: Check IPTABLES is installed
+  ansible.builtin.dnf:
+    name: iptables
+    state: present
+
+- name: Enable IPTABLES service
+  ansible.builtin.systemd:
+    name: nftables
+    enabled: true
+    state: restarted
+
+- name: Enable NAT
+  ansible.builtin.iptables:
+    table: nat
+    chain: POSTROUTING
+    out_interface: enp0s17
+    source: 0.0.0.0/0
+    jump: MASQUERADE

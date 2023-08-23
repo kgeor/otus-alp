@@ -1,0 +1,175 @@
+---
+- hosts: inetRouter
+  become: true
+  tasks:
+    - import_tasks: ./tasks/inet-router.yml
+  handlers:
+    - name: reactivate connection
+      ansible.builtin.shell: nmcli conn up enp0s17
+
+    - name: restart NetworkManager 
+      ansible.builtin.service: 
+        name: NetworkManager
+        state: restarted
+
+- hosts: centralRouter
+  become: true
+  tasks:
+    - import_tasks: ./tasks/central-router.yml
+
+  handlers:
+    - name: reactivate connection
+      ansible.builtin.shell: nmcli conn up enp0s17
+
+    - name: restart NetworkManager 
+      ansible.builtin.service: 
+        name: NetworkManager
+        state: restarted
+
+- hosts: centralServer
+  become: true
+  tasks:
+    - name: Install traceroute
+      ansible.builtin.dnf:
+        name: traceroute
+        state: present
+    
+    - name: Set no default route on DHCP Ethernet connection
+      community.general.nmcli:
+        conn_name: enp0s17
+        ifname: enp0s17
+        type: ethernet
+        gw4_ignore_auto: true
+        #never_default4 : true
+        state: present
+      notify:
+        - reactivate connection
+
+    - name: Delete default Ethernet connection for adapter 2
+      community.general.nmcli:
+        conn_name: "Wired connection {{ item }}"
+        state: absent
+      loop: [1, 2]
+    
+    - name: Add Ethernet connection for adapter 2
+      community.general.nmcli:
+        conn_name: enp0s8
+        ifname: enp0s8
+        type: ethernet
+        ip4: "{{ ip_addr_1 }}"
+        gw4: "{{ ip_gw }}"
+        state: present
+      notify:
+        - restart NetworkManager
+
+  handlers:
+    - name: reactivate connection
+      ansible.builtin.shell: nmcli conn up enp0s17
+
+    - name: restart NetworkManager 
+      ansible.builtin.service: 
+        name: NetworkManager
+        state: restarted
+
+- hosts: office1Router
+  become: true
+  tasks:
+    - name: Remove default net config
+      ansible.builtin.file:
+        path: /etc/netplan/50-cloud-init.yaml
+        state: absent
+    
+    - name: Copy netplan file
+      ansible.builtin.copy:
+        src: files/50-vagrant-r.yaml
+        dest: /etc/netplan/50-vagrant.yaml
+      notify: apply netplan
+
+    - name: Enable IP forwarding
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_set: true
+        state: present
+        reload: true
+
+  handlers:
+    - name: apply netplan
+      ansible.builtin.shell: netplan apply
+
+- hosts: office1Server
+  become: true
+  tasks:
+    - name: Install traceroute
+      ansible.builtin.apt:
+        name: traceroute
+        update_cache: true        
+        state: present
+
+    - name: Remove default net config
+      ansible.builtin.file:
+        path: /etc/netplan/50-cloud-init.yaml
+        state: absent
+    
+    - name: Copy netplan file
+      ansible.builtin.copy:
+        src: files/50-vagrant-s.yaml
+        dest: /etc/netplan/50-vagrant.yaml
+      notify: apply netplan
+
+  handlers:
+    - name: apply netplan
+      ansible.builtin.shell: netplan apply
+
+- hosts: office2Router
+  become: true
+  tasks:
+    #- name: Disable DHCP routes
+    #  ansible.builtin.copy:
+    #    src: files/dhclient.conf
+    #    dest: /etc/dhcp/
+    #  notify: restart network  
+
+    - name: Change config
+      ansible.builtin.copy:
+        src: files/interfaces_r
+        dest: /etc/network/interfaces
+      notify: restart network  
+
+    - name: Enable IP forwarding
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_set: true
+        state: present
+        reload: true
+
+  handlers:
+    - name: reactivate interface
+      ansible.builtin.shell: ifup eth1
+
+    - name: restart network 
+      ansible.builtin.service: 
+        name: networking
+        state: restarted
+
+- hosts: office2Server
+  become: true
+  tasks:
+    - name: Install traceroute
+      ansible.builtin.apt:
+        name: traceroute
+        update_cache: true
+        state: present
+
+    - name: Change network config
+      ansible.builtin.copy:
+        src: files/interfaces_s
+        dest: /etc/network/interfaces
+      notify: restart network  
+
+  handlers:
+    - name: restart network 
+      ansible.builtin.service: 
+        name: networking
+        state: restarted

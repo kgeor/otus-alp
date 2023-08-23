@@ -1,0 +1,73 @@
+- name: Set no default route on DHCP Ethernet connection
+  community.general.nmcli:
+    conn_name: enp0s17
+    ifname: enp0s17
+    type: ethernet
+    gw4_ignore_auto: true
+    #never_default4 : true
+    state: present
+  notify:
+    - reactivate connection
+    
+- name: Delete default Ethernet connections
+  community.general.nmcli:
+    conn_name: "Wired connection {{ item }}"
+    state: absent
+  loop: [1, 2, 3, 4, 5, 6, 7]
+      
+- name: Add Ethernet connection for all adapters
+  community.general.nmcli:
+    conn_name: "{{ item.conn }}"
+    ifname: "{{ item.conn }}"
+    type: ethernet
+    ip4: "{{ item.ip }}"
+    state: present
+  loop:
+    - { conn: enp0s8, ip: "{{ ip_addr_1 }}" }
+    - { conn: enp0s9, ip: "{{ ip_addr_2 }}" }
+    - { conn: enp0s10, ip: "{{ ip_addr_3 }}" }
+    - { conn: enp0s16, ip: "{{ ip_addr_4 }}" }
+    - { conn: enp0s3, ip: "{{ ip_addr_5 }}" }
+    - { conn: enp0s18, ip: "{{ ip_addr_6 }}" }
+  notify:
+  - restart NetworkManager 
+
+- name: Add default route
+  community.general.nmcli:
+    conn_name: enp0s8
+    type: ethernet
+    gw4: "{{ ip_gw }}"
+    state: present
+
+- name: Set network routes (to office1)
+  community.general.nmcli:
+    conn_name: enp0s3
+    type: ethernet
+    routes4:
+      - "192.168.2.1/26 {{ ip_nh_o1 }}"
+      - "192.168.2.65/26 {{ ip_nh_o1 }}"
+      - "192.168.2.129/26 {{ ip_nh_o1 }}"
+      - "192.168.2.193/26 {{ ip_nh_o1 }}"
+    state: present
+  notify:
+    - restart NetworkManager
+
+- name: Set network routes (to office2)
+  community.general.nmcli:
+    conn_name: enp0s18
+    type: ethernet
+    routes4:
+      - "192.168.1.0/25 {{ ip_nh_o2 }}"
+      - "192.168.1.128/26 {{ ip_nh_o2 }}"
+      - "192.168.1.192/26 {{ ip_nh_o2 }}"
+    state: present
+  notify:
+    - restart NetworkManager
+
+- name: Enable IP forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: true
+    state: present
+    reload: true

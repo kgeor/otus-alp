@@ -1,0 +1,81 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+BOX_RAM = 1024
+BOX_CPU = 2
+IP_R1 = "10.0.254.1"
+IP_R2 = "10.0.255.1"
+IP_RC1 = "10.0.254.2"
+IP_RC2 = "10.0.255.2"
+IP_RCL = "10.0.5.1"
+IP_SERVER = "10.0.5.10"
+Vagrant.configure(2) do |config|
+  config.vm.box = "kgeor/rocky9-kernel6"
+  config.vm.synced_folder ".", "/vagrant"
+  config.vm.provider "virtualbox" do |vb|
+      vb.memory = BOX_RAM
+      vb.cpus = BOX_CPU
+  end
+
+  if Vagrant.has_plugin?("vagrant-vbguest")
+    config.vbguest.auto_update = false  
+  end
+  
+  config.vm.define "inetRouter1" do |inetRouter1|
+    inetRouter1.vm.hostname = "InetRouter1"
+    inetRouter1.vm.network "private_network", auto_config: false, virtualbox__intnet: "r1-central"
+    inetRouter1.vm.provision "ansible" do |ansible|
+      ansible.playbook = "./ansible/playbook.yml"
+      ansible.host_vars = {
+        "inetRouter1" => { "ip_addr" => IP_R1+"/30",
+                   "ip_LAN_gw" => IP_RC1 }
+      }
+      ansible.raw_arguments = ["--tags=untagged,inetRouter1"]
+      ansible.compatibility_mode = "2.0"
+    end
+  end
+  config.vm.define "inetRouter2" do |inetRouter2|
+    inetRouter2.vm.hostname = "InetRouter2"
+    inetRouter2.vm.network "forwarded_port", guest: 8080, host: 8080
+    inetRouter2.vm.network "private_network", auto_config: false, virtualbox__intnet: "r2-central"
+    inetRouter2.vm.provision "ansible" do |ansible|
+      ansible.playbook = "./ansible/playbook.yml"
+      ansible.host_vars = {
+        "inetRouter2" => { "ip_addr" => IP_R2+"/30",
+                   "ip_LAN_gw" => IP_RC2,
+                   "ip_server" => IP_SERVER }
+      }
+      ansible.raw_arguments = ["--tags=untagged,inetRouter2"]
+      ansible.compatibility_mode = "2.0"
+    end
+  end
+  config.vm.define "centralRouter" do |centralRouter|
+    centralRouter.vm.hostname = "centralRouter"
+    centralRouter.vm.network "private_network", auto_config: false, virtualbox__intnet: "r1-central"
+    centralRouter.vm.network "private_network", auto_config: false, virtualbox__intnet: "r2-central"
+    centralRouter.vm.network "private_network", auto_config: false, virtualbox__intnet: "LAN"
+    centralRouter.vm.provision "ansible" do |ansible|
+      ansible.playbook = "./ansible/playbook.yml"
+      ansible.host_vars = {
+        "centralRouter" => { "ip_addr_R1" => IP_RC1+"/30",
+                      "ip_addr_R2" => IP_RC2+"/30",
+                      "ip_addr_LAN" => IP_RCL+"/24",
+                      "ip_R1" => IP_R1 }
+      }
+      #ansible.raw_arguments = ["--tags=centralRouter"]
+      ansible.compatibility_mode = "2.0"
+    end
+  end
+  config.vm.define "nginx" do |server|
+    server.vm.hostname = "central-web"
+    server.vm.network "private_network", auto_config: false, virtualbox__intnet: "LAN"
+    server.vm.provision "ansible" do |ansible|
+      ansible.playbook = "./ansible/playbook.yml"
+      #ansible.raw_arguments = ["--tags=nginx"]
+      ansible.host_vars = {
+        "nginx" => { "ip_addr" => IP_SERVER+"/24",
+                     "ip_gw" => IP_RCL,}
+      }
+      ansible.compatibility_mode = "2.0"
+    end
+  end 
+end

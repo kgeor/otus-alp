@@ -1,0 +1,24 @@
+---
+- name: Reload network config
+  ansible.builtin.shell: nmcli connection reload
+
+- name: Restart dhcp
+  service:
+    name: dhcpd
+    state: restarted
+    enabled: true
+
+- name: Restart tftp
+  service:
+    name: tftp.service
+    state: restarted
+
+- name: Restart httpd
+  service:
+    name: httpd
+    state: restarted
+
+- name: Restart nginx
+  service:
+    name: nginx
+    state: restarted

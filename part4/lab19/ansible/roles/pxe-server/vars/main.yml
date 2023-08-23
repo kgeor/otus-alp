@@ -1,0 +1,4 @@
+---
+image: Rocky-9.2-x86_64-minimal.iso
+url: https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.2-x86_64-minimal.iso
+path: /var/lib/tftpboot/rocky

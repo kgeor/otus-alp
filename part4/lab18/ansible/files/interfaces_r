@@ -1,0 +1,43 @@
+# interfaces(5) file used by ifup(8) and ifdown(8)
+# Include files from /etc/network/interfaces.d:
+source-directory /etc/network/interfaces.d
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+allow-hotplug eth0
+iface eth0 inet dhcp
+
+#auto eth1
+allow-hotplug eth1
+iface eth1 inet static
+      address 192.168.255.6
+      netmask 255.255.255.252
+up ip route delete default
+post-up ip route add 0.0.0.0/0 via 192.168.255.5
+
+#auto eth2
+allow-hotplug eth2
+iface eth2 inet static
+      address 192.168.1.1
+      netmask 255.255.255.128
+
+#auto eth3
+allow-hotplug eth3
+iface eth3 inet static
+      address 192.168.1.129
+      netmask 255.255.255.192
+
+#auto eth4
+allow-hotplug eth4
+iface eth4 inet static
+      address 192.168.1.193
+      netmask 255.255.255.192
+
+#auto eth5
+allow-hotplug eth5
+iface eth5 inet static
+      address 192.168.56.30
+      netmask 255.255.255.0

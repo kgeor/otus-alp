@@ -1,0 +1,25 @@
+---
+- name: reload network config
+  ansible.builtin.shell: nmcli connection reload
+  
+- name: restart NetworkManager 
+  ansible.builtin.service: 
+    name: NetworkManager
+    state: restarted
+
+- name: restart firewalld
+  ansible.builtin.service: 
+    name: firewalld
+    state: restarted
+
+- name: restart knockd 
+  ansible.builtin.service: 
+    name: knockd
+    state: restarted
+    enabled: true
+
+- name: save firewalld config
+  ansible.builtin.shell:  firewall-cmd --runtime-to-permanent
+
+- name: reload firewalld
+  ansible.builtin.shell:  firewall-cmd --reload

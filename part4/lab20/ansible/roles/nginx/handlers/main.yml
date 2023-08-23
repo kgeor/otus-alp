@@ -1,0 +1,20 @@
+---  
+- name: Enable nginx
+  service:
+   name: nginx
+   enabled: yes
+
+- name: Restart nginx
+  service:
+   name: nginx
+   state: restarted
+
+- name: Reload nginx
+  service:
+   name: nginx
+   state: reloaded
+
+- name: Restart chronyd
+  service:
+   name: chronyd
+
