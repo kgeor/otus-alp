@@ -1,0 +1,36 @@
+frr version 8.5.2
+frr defaults traditional
+hostname {{ ansible_hostname }}
+log syslog informational
+no ipv6 forwarding
+service integrated-vtysh-config
+!
+interface enp0s8
+ description {{ int_desc1 }}
+ ip address {{ int_ip1 }}
+ ip ospf dead-interval 30
+ ip ospf mtu-ignore
+exit
+!
+interface enp0s9
+ description {{ int_desc2 }}
+ ip address {{ int_ip2 }}
+ ip ospf dead-interval 30
+ ip ospf mtu-ignore
+exit
+!
+interface enp0s10
+ description {{ int_desc3 }}
+ ip address {{ int_ip3 }}
+ ip ospf passive
+exit
+!
+router ospf
+ ospf router-id {{ router_id }}
+ network {{ net1 }} area 0
+ network {{ net2 }} area 0
+ network {{ net3 }} area 0
+exit
+!
+log file /var/log/frr/frr.log
+default-information originate always

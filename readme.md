@@ -39,3 +39,7 @@
 - [DHCP, PXE](./part4/lab19)
 
 - [Firewall](./part4/lab20)
+
+- [OSPF](./part4/lab21)
+
+- [VPN](./part4/lab22)

@@ -1,0 +1,31 @@
+---
+- hosts: all
+  become: true
+  tasks:
+    - name: Delete default Ethernet connection with DHCP
+      community.general.nmcli:
+        conn_name: "Wired connection 1"
+        state: absent
+    
+    - name: Add an Ethernet connection with static IP configuration
+      community.general.nmcli:
+        conn_name: enp0s8
+        ifname: enp0s8
+        type: ethernet
+        ip4: "{{ ip_addr }}"
+        state: present
+      notify: reload network config
+
+  handlers:
+    - name: reload network config
+      ansible.builtin.shell: nmcli connection reload
+
+- hosts: client
+  become: true
+  roles:
+    - ovpn-client
+
+- hosts: server
+  become: true
+  roles:
+    - ovpn-server

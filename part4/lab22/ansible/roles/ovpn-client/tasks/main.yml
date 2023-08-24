@@ -1,0 +1,39 @@
+---
+- name: Install EPEL Repo package from standard repo
+  ansible.builtin.dnf:
+    name: epel-release
+    state: latest
+
+- name: Install packages
+  ansible.builtin.dnf:
+    name: "{{ item }}"
+    state: latest
+  loop:
+    - openvpn
+    - iperf3
+
+- name: Copy a OpenVPN server configs
+  ansible.builtin.copy:
+    src: "files/{{ item }}"
+    dest: /etc/openvpn/
+    #owner: root
+    #group: root
+    #mode: '0644'
+  loop:
+    - static.key
+    - client-tap.conf
+    - client-tun.conf
+
+- name: Set up OpenVPN service
+  ansible.builtin.copy:
+    src: files/openvpn@.service
+    dest: /etc/systemd/system/
+    #owner: root
+    #group: root
+    #mode: '0644'
+#- name: Creating firewall rule for rsyslog (UDP)
+#  ansible.posix.firewalld:
+#    port: "{{ rsyslog_port }}/udp"
+#    permanent: yes
+#    immediate: yes
+#    state: enabled

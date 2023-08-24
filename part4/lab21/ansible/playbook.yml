@@ -1,0 +1,8 @@
+---
+- hosts: 
+  - router1
+  - router2
+  - router3
+  become: true
+  roles:
+    - frr-router

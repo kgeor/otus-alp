@@ -1,0 +1,91 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+MACHINES = {
+  :router1 => {
+        :box_name => "ubuntu/jammy64",
+        :vm_name => "router1",
+        :net => [
+                   {ip: '10.0.10.1', adapter: 2, netmask: "255.255.255.252", virtualbox__intnet: "r1-r2"},
+                   {ip: '10.0.12.1', adapter: 3, netmask: "255.255.255.252", virtualbox__intnet: "r1-r3"},
+                   {ip: '192.168.10.1', adapter: 4, netmask: "255.255.255.0", virtualbox__intnet: "net1"},
+                   {ip: '192.168.56.10', adapter: 5},
+                ]
+  },
+
+  :router2 => {
+        :box_name => "ubuntu/jammy64",
+        :vm_name => "router2",
+        :net => [
+                   {ip: '10.0.10.2', adapter: 2, netmask: "255.255.255.252", virtualbox__intnet: "r1-r2"},
+                   {ip: '10.0.11.2', adapter: 3, netmask: "255.255.255.252", virtualbox__intnet: "r2-r3"},
+                   {ip: '192.168.20.1', adapter: 4, netmask: "255.255.255.0", virtualbox__intnet: "net2"},
+                   {ip: '192.168.56.11', adapter: 5},
+                ]
+  },
+
+  :router3 => {
+        :box_name => "ubuntu/jammy64",
+        :vm_name => "router3",
+        :net => [
+                   {ip: '10.0.11.1', adapter: 2, netmask: "255.255.255.252", virtualbox__intnet: "r2-r3"},
+                   {ip: '10.0.12.2', adapter: 3, netmask: "255.255.255.252", virtualbox__intnet: "r1-r3"},
+                   {ip: '192.168.30.1', adapter: 4, netmask: "255.255.255.0", virtualbox__intnet: "net3"},
+                   {ip: '192.168.56.12', adapter: 5},
+                ]
+  }
+}
+
+Vagrant.configure("2") do |config|
+  MACHINES.each do |boxname, boxconfig|
+    if Vagrant.has_plugin?("vagrant-vbguest")
+      config.vbguest.auto_update = false  
+    end
+    config.vm.define boxname do |box|
+      box.vm.box = boxconfig[:box_name]
+      box.vm.host_name = boxconfig[:vm_name]
+      boxconfig[:net].each do |ipconf|
+        box.vm.network "private_network", **ipconf
+      end
+      box.vm.provision "ansible" do |ansible|
+        ansible.playbook = "./ansible/playbook.yml"
+        ansible.host_vars = {
+          "router1" => { "int_desc1" => "r1-r2",
+                         "int_desc2" => "r1-r3",
+                         "int_desc3" => "net_router1",
+                         "int_ip1" => "10.0.10.1/30",
+                         "int_ip2" => "10.0.12.1/30",
+                         "int_ip3" => "192.168.10.1/24",
+                         "router_id" => "1.1.1.1",
+                         "net1" => "10.0.10.0/30",
+                         "net2" => "10.0.12.0/30",
+                         "net3" => "192.168.10.0/24"
+                       },
+          "router2" => { "int_desc1" => "r1-r2",
+                         "int_desc2" => "r2-r3",
+                         "int_desc3" => "net_router2",
+                         "int_ip1" => "10.0.10.2/30",
+                         "int_ip2" => "10.0.11.2/30",
+                         "int_ip3" => "192.168.20.1/24",
+                         "router_id" => "2.2.2.2",
+                         "net1" => "10.0.10.0/30",
+                         "net2" => "10.0.11.0/30",
+                         "net3" => "192.168.20.0/24"
+                       },
+          "router3" => { "int_desc1" => "r2-r3",
+                         "int_desc2" => "r1-r3",
+                         "int_desc3" => "net_router2",
+                         "int_ip1" => "10.0.11.1/30",
+                         "int_ip2" => "10.0.12.2/30",
+                         "int_ip3" => "192.168.30.1/24",
+                         "router_id" => "3.3.3.3",
+                         "net1" => "10.0.11.0/30",
+                         "net2" => "10.0.12.0/30",
+                         "net3" => "192.168.30.0/24"
+                       }
+        }
+        ansible.compatibility_mode = "2.0"
+        ansible.limit = boxconfig[:vm_name]
+      end
+    end
+  end
+end
