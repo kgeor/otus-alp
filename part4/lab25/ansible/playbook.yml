@@ -1,0 +1,37 @@
+---
+- hosts: 
+  - all
+  become: true
+  tasks:
+  - name: Deleting default Ethernet connection with DHCP
+    community.general.nmcli:
+      conn_name: "Wired connection 1"
+      state: absent
+  
+  - name: Adding an Ethernet connection with static IP configuration
+    community.general.nmcli:
+      conn_name: enp0s8
+      ifname: enp0s8
+      type: ethernet
+      ip4: "{{ ip }}"
+      state: present
+
+- hosts: 
+  - ipa.otus.lan
+  become: true
+  tasks:
+    - name: Run freeipa installation (it takes a very long time)
+      ansible.builtin.shell: |
+        timedatectl set-timezone Europe/Moscow
+        systemctl enable chronyd --now
+        echo '192.168.57.10 ipa.otus.lan ipa' >> /etc/hosts
+        dnf -y install freeipa-server
+        ipa-server-install --domain otus.lan --realm OTUS.LAN --ds-password DM_otus23 --admin-password otus2023 --unattended
+        firewall-cmd --add-service=freeipa-ldap
+        firewall-cmd --runtime-to-permanent
+
+- hosts: 
+  - client*
+  become: true
+  roles:
+    - freeipa_client

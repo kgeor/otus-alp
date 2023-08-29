@@ -1,0 +1,14 @@
+---
+- name: reload network config
+  ansible.builtin.shell: nmcli connection reload
+
+- name: remove default
+  ansible.builtin.shell: ip route del default
+  
+- name: restart NetworkManager 
+  ansible.builtin.service: 
+    name: NetworkManager
+    state: restarted
+
+- name: apply netplan
+  ansible.builtin.shell: netplan apply

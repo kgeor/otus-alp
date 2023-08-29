@@ -1,0 +1,16 @@
+---
+- hosts: 
+  - testClient1
+  - testClient2
+  - testServer1
+  - testServer2
+  become: true
+  roles:
+    - net_vlan
+
+- hosts: 
+  - inetRouter
+  - centralRouter
+  become: true
+  roles:
+    - net_bond

@@ -1,0 +1,39 @@
+---
+- name: Print all available facts
+  ansible.builtin.debug:
+    var: ansible_facts['distribution']
+
+- name: Setting up VLAN config
+  block:
+  - name: Deleting default Ethernet connection with DHCP
+    community.general.nmcli:
+      conn_name: "Wired connection 1"
+      state: absent
+
+  - name: Create VLAN {{ vlan_id }}
+    community.general.nmcli:
+      type: vlan
+      conn_name: "vlan{{ vlan_id }}" #enp0s8.1
+      vlandev: enp0s8
+      vlanid: "{{ vlan_id }}"
+      ip4: "{{ ip }}"
+      state: present
+    notify: 
+      - restart NetworkManager
+
+  when: ansible_facts['distribution'] == "Rocky"
+
+- name: Setting up VLAN config
+  block:
+  - name: Remove default net config
+    ansible.builtin.file:
+      path: /etc/netplan/50-cloud-init.yaml
+      state: absent
+  
+  - name: Copy netplan file
+    ansible.builtin.template:
+      src: roles/net_vlan/templates/50-vagrant.yaml.j2
+      dest: /etc/netplan/50-vagrant.yaml
+    notify: apply netplan
+
+  when: ansible_facts['distribution'] == "Ubuntu"

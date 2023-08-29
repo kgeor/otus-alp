@@ -43,3 +43,9 @@
 - [OSPF](./part4/lab21)
 
 - [VPN](./part4/lab22)
+
+- [DNS](./part4/lab23)
+
+- [VLAN, Bond](./part4/lab24)
+
+- [LDAP](./part4/lab25)

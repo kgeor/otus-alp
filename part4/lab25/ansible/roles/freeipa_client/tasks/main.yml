@@ -1,0 +1,32 @@
+---
+#Установка временной зоны Европа/Москва    
+  - name: Set up timezone
+    timezone:
+      name: "Europe/Moscow"
+  
+  #Запуск службы Chrony, добавление её в автозагрузку
+  - name: enable chrony
+    service:
+      name: chronyd
+      state: restarted
+      enabled: true
+
+  - name: change /etc/hosts
+    template:
+      src: roles/freeipa_client/templates/hosts.j2
+      dest: /etc/hosts
+      owner: root
+      group: root
+      mode: 0644
+  
+  #Установка клиента Freeipa
+  - name: install module ipa-client
+    dnf:
+      name:
+        - freeipa-client
+      state: present
+      
+  #Добавление хоста к домену
+  - name: add host to ipa-server
+    shell: echo -e "yes\nyes" | ipa-client-install --mkhomedir --domain=OTUS.LAN --server=ipa.otus.lan --no-ntp -p admin -w otus2023
+  

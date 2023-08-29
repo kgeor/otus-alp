@@ -1,0 +1,47 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure(2) do |config|
+  config.vm.box = "kgeor/rocky9-kernel6"
+
+  config.vm.provision "ansible" do |ansible|
+    #ansible.verbose = "v"
+    ansible.playbook = "ansible/playbook.yml"
+    ansible.host_vars = {
+        "ns01" => { "ip" => "192.168.50.10/24"},
+        "ns02" => { "ip" => "192.168.50.11/24"},
+        "client01" => { "ip" => "192.168.50.15/24"},
+        "client02" => { "ip" => "192.168.50.16/24"}
+    }
+    ansible.compatibility_mode = "2.0"
+  end
+  
+  if Vagrant.has_plugin?("vagrant-vbguest")
+    config.vbguest.auto_update = false  
+  end
+
+  config.vm.provider "virtualbox" do |v|
+	  v.memory = 512
+  end
+
+  config.vm.define "ns01" do |ns01|
+    ns01.vm.network "private_network", auto_config: false, virtualbox__intnet: "dns"
+    ns01.vm.hostname = "ns01"
+  end
+
+  config.vm.define "ns02" do |ns02|
+    ns02.vm.network "private_network", auto_config: false, virtualbox__intnet: "dns"
+    ns02.vm.hostname = "ns02"
+  end
+
+  config.vm.define "client01" do |client01|
+    client01.vm.network "private_network", auto_config: false, virtualbox__intnet: "dns"
+    client01.vm.hostname = "client01"
+  end
+
+  config.vm.define "client02" do |client02|
+    client02.vm.network "private_network", auto_config: false, virtualbox__intnet: "dns"
+    client02.vm.hostname = "client02"
+  end
+
+end

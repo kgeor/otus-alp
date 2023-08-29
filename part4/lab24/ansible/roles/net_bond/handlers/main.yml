@@ -1,0 +1,13 @@
+---
+
+- name: set bond opts
+  ansible.builtin.shell: nmcli connection modify {{ bond_name }} bond.options miimon=100,fail_over_mac=1,mode=active-backup  
+
+- name: reload connection config
+  ansible.builtin.shell: nmcli connection reload && nmcli conn up bond0
+
+- name: restart NetworkManager 
+  ansible.builtin.service: 
+    name: NetworkManager
+    state: restarted
+

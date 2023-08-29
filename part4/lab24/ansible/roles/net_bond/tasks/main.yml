@@ -1,0 +1,40 @@
+---
+- name: Setting up GENERAL config
+  tags: general
+  block:
+  - name: Deleting default Ethernet connections for bond's interfaces
+    community.general.nmcli:
+      conn_name: "Wired connection {{ item }}"
+      state: absent
+    loop:
+      - 1
+      - 2
+      - 3
+
+  - name: Creating Bond interface
+    community.general.nmcli:
+      conn_name: "{{ bond_name }}" #enp0s8.1
+      type: bond
+      mode: active-backup
+      #miimon: 100
+      ip4: "{{ ip }}"
+      state: present
+    notify: 
+      - set bond opts
+      - reload connection config
+
+  - name: Adding Bond slave interfaces
+    community.general.nmcli:
+      conn_name: "bond0-{{ item }}"
+      type: bond-slave
+      master: bond0
+      ifname: "{{ item }}"
+      #method4: disabled
+      #method6: disabled
+      state: present
+    loop:
+      - enp0s8
+      - enp0s9
+    notify:
+      - restart NetworkManager 
+  

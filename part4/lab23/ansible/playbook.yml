@@ -1,0 +1,203 @@
+---
+- hosts: all
+  become: true
+  tasks:
+  - name: Delete default Ethernet connection with DHCP
+    community.general.nmcli:
+      conn_name: "Wired connection 1"
+      state: absent
+  
+  - name: Add Ethernet connection with static IP
+    community.general.nmcli:
+      conn_name: enp0s8
+      ifname: enp0s8
+      type: ethernet
+      ip4: "{{ ip }}"
+      state: present
+    notify: reloading network config
+
+  - name: install DNS package
+    ansible.builtin.dnf:
+      name: "{{ item }}"
+      state: latest
+    loop:
+      - bind
+      - bind-utils
+
+  - name: ensure chronyd is running and enabled
+    service: 
+      name: chronyd
+      state: restarted
+      enabled: yes
+
+  - name: copy transferkey to all servers and the client
+    copy:
+      src: files/named.zonetransfer.key
+      dest: /etc/named.zonetransfer.key
+      owner: root
+      group: named
+      mode: 0644
+
+  handlers:
+    - name: reloading network config
+      ansible.builtin.shell: nmcli connection reload
+
+- hosts: ns01
+  become: true
+  tasks:
+  - name: copy named.conf
+    copy: 
+      src: files/master-named-final.conf
+      dest: /etc/named.conf
+      owner: root
+      group: named
+      mode: 0640
+
+  - name: copy zones
+    copy: 
+      src: "{{ item }}"
+      dest: /etc/named/
+      owner: root
+      group: named
+      mode: 0660
+    with_fileglob:
+      - files/named.d*
+      - files/named.newdns*
+
+  - name: copy resolv.conf to the servers
+    template: 
+      src: files/servers-resolv.conf.j2
+      dest: /etc/resolv.conf
+      owner: root
+      group: root
+      mode: 0644
+  
+  - name: set /etc/named permissions
+    file: 
+      path: /etc/named
+      owner: root
+      group: named
+      mode: 0670
+
+  - name: Set fcontext for zone files
+    community.general.sefcontext:
+      target: '/etc/named(/.*)?'
+      setype: named_zone_t
+      state: present
+
+  - name: Set fcontext for key files
+    community.general.sefcontext:
+      target: '/etc/{{ item }}'
+      setype: named_conf_t
+      state: present
+    loop:
+      - named.root.key
+      - named.zonetransfer.key
+
+  - name: Apply new SELinux file context to filesystem
+    ansible.builtin.command: restorecon -irv /etc/
+
+  - name: Create firewall rule for DNS
+    ansible.posix.firewalld:
+      port: "{{ item }}"
+      permanent: yes
+      immediate: yes
+      state: enabled
+    loop:
+      - 53/tcp
+      - 53/udp
+
+  - name: ensure named is restarted and enabled
+    service: 
+      name: named
+      state: restarted
+      enabled: yes
+
+- hosts: ns02
+  become: true
+  tasks:
+  - name: copy named.conf
+    copy: 
+      src: files/slave-named-final.conf
+      dest: /etc/named.conf
+      owner: root
+      group: named
+      mode: 0640
+
+  - name: copy resolv.conf to the servers
+    copy: 
+      src: files/servers-resolv.conf.j2
+      dest: /etc/resolv.conf
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: set /etc/named permissions
+    file: 
+      path: /etc/named
+      owner: root
+      group: named
+      mode: 0670
+  
+  - name: Set fcontext for zone files
+    community.general.sefcontext:
+      target: '/etc/named(/.*)?'
+      setype: named_zone_t
+      state: present
+
+  - name: Set fcontext for key files
+    community.general.sefcontext:
+      target: '/etc/{{ item }}'
+      setype: named_conf_t
+      state: present
+    loop:
+      - named.root.key
+      - named.zonetransfer.key
+
+  - name: Apply new SELinux file context to filesystem
+    ansible.builtin.command: restorecon -irv /etc/
+
+  - name: Create firewall rule for DNS
+    ansible.posix.firewalld:
+      port: "{{ item }}"
+      permanent: yes
+      immediate: yes
+      state: enabled
+    loop:
+      - 53/tcp
+      - 53/udp
+      
+  - name: ensure named is restarted and enabled
+    service: 
+      name: named
+      state: restarted
+      enabled: yes
+    
+- hosts: 
+  - client01
+  - client02
+  become: true
+  tasks:
+  - name: copy resolv.conf to the client
+    copy:
+      src: files/client-resolv.conf
+      dest: /etc/resolv.conf
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: copy rndc conf file
+    copy: 
+      src: files/rndc.conf
+      dest: /home/vagrant/rndc.conf
+      owner: vagrant
+      group: vagrant
+      mode: 0644
+
+  - name: copy motd to the client
+    copy:
+      src: files/client-motd
+      dest: /etc/motd
+      owner: root
+      group: root
+      mode: 0644
