@@ -41,18 +41,39 @@
     mode: 0640
 
 # Копируем файл frr.conf на хосты, указываем владельца и права
-- name: set up OSPF 
+#- name: set up OSPF 
+#  template:
+#    src: roles/frr-router/templates/frr.conf.j2
+#    dest: /etc/frr/frr.conf
+#    owner: frr
+#    group: frr
+#    mode: 0640
+#  notify: restart frr
+
+- name: enable asymmetric routing
+  tags: 
+    - modify
+    - untagged
+  sysctl:
+    name: net.ipv4.conf.all.rp_filter
+    value: '0'
+    state: present
+  when: default_cost != true
+
+- name: set up OSPF
+  tags: 
+    - modify
+    - untagged
   template:
-    src: roles/frr-router/templates/frr.conf.j2
+    src: roles/frr-router/templates/frr.conf.3.j2
     dest: /etc/frr/frr.conf
     owner: frr
     group: frr
     mode: 0640
+  notify: restart frr
 
 # Перезапускам FRR и добавляем в автозагрузку
-- name: restart FRR
+- name: enable FRR
   service:
     name: frr
-    state: restarted
     enabled: true
-

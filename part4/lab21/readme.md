@@ -52,5 +52,61 @@ PING 192.168.20.1 (192.168.20.1) 56(84) bytes of data.
 rtt min/avg/max/mdev = 0.480/0.532/0.584/0.052 ms
 ```
 Маршрутизация настроена корректно, трафик свободно проходит до удаленных сетей.
+## Асимметричная маршрутизация
+на хосте запустим плейбук с параметрами
+```
+ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory -l all ansible/playbook.yml -t modify -e '{"ansible_host_key_checking": false,"default_cost": false}'
+```
+и проверим на роутерах 1 и 2
+```
+router1# show ip route ospf
+Codes: K - kernel route, C - connected, S - static, R - RIP,
+       O - OSPF, I - IS-IS, B - BGP, E - EIGRP, N - NHRP,
+       T - Table, v - VNC, V - VNC-Direct, A - Babel, F - PBR,
+       f - OpenFabric,
+       > - selected route, * - FIB route, q - queued, r - rejected, b - backup
+       t - trapped, o - offload failure
 
+O   10.0.10.0/30 [110/300] via 10.0.12.2, enp0s9, weight 1, 1d09h15m
+O>* 10.0.11.0/30 [110/200] via 10.0.12.2, enp0s9, weight 1, 1d09h15m
+O   10.0.12.0/30 [110/100] is directly connected, enp0s9, weight 1, 1d09h16m
+O   192.168.10.0/24 [110/100] is directly connected, enp0s10, weight 1, 1d09h16m
+O>* 192.168.20.0/24 [110/300] via 10.0.12.2, enp0s9, weight 1, 1d09h15m
+O>* 192.168.30.0/24 [110/200] via 10.0.12.2, enp0s9, weight 1, 1d09h15m
+...
+root@router1:~# ping -I 192.168.10.1 192.168.20.1
+root@router2:~# tcpdump -i enp0s9
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enp0s9, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+06:57:27.058143 IP 192.168.10.1 > router2: ICMP echo request, id 1, seq 14, length 64
+06:57:28.109842 IP 192.168.10.1 > router2: ICMP echo request, id 1, seq 15, length 64
+06:57:29.146258 IP 192.168.10.1 > router2: ICMP echo request, id 1, seq 16, length 64
+root@router2:~# tcpdump -i enp0s8
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enp0s8, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+06:58:00.355451 IP router2 > 192.168.10.1: ICMP echo reply, id 1, seq 45, length 64
+06:58:01.400439 IP router2 > 192.168.10.1: ICMP echo reply, id 1, seq 46, length 64
+06:58:02.440490 IP router2 > 192.168.10.1: ICMP echo reply, id 1, seq 47, length 64
+```
+на router2 трафик приходит на enp0s9, а ответный уходит c enp0s8
+
+## Симметричная маршрутизация
+на хосте запустим плейбук с параметрами
+```
+ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory -l all ansible/playbook.yml -t modify -e '{"ansible_host_key_checking": false,"default_cost": false,"symmetric_routing": true}'
+```
+и проверим на роутерах 1 и 2
+```
+root@router1:~# ping -I 192.168.10.1 192.168.20.1
+root@router2:~# tcpdump -i enp0s9
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enp0s9, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+08:02:15.111839 IP 192.168.10.1 > router2: ICMP echo request, id 2, seq 5, length 64
+08:02:15.111849 IP router2 > 192.168.10.1: ICMP echo reply, id 2, seq 5, length 64
+08:02:16.168843 IP 192.168.10.1 > router2: ICMP echo request, id 2, seq 6, length 64
+08:02:16.168863 IP router2 > 192.168.10.1: ICMP echo reply, id 2, seq 6, length 64
+08:02:17.170832 IP 192.168.10.1 > router2: ICMP echo request, id 2, seq 7, length 64
+08:02:17.170854 IP router2 > 192.168.10.1: ICMP echo reply, id 2, seq 7, length 64
+```
+на router2 трафик теперь ходит симметрично через enp0s9
 **PROFIT!!!**
