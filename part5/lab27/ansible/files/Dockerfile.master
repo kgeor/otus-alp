@@ -1,0 +1,3 @@
+FROM mysql:8
+COPY mysqlmaster/bet.dmp /var/lib/mysql/
+RUN 

@@ -1,0 +1,91 @@
+---
+- hosts: 
+  - docker
+  become: true
+
+  tasks:
+    #- name: Delete default Ethernet connection for adapter 2
+    #  community.general.nmcli:
+    #    conn_name: "Wired connection 1"
+    #    state: absent
+    #
+    #- name: Add Ethernet connection for adapter 2
+    #  community.general.nmcli:
+    #    conn_name: enp0s8
+    #    ifname: enp0s8
+    #    type: ethernet
+    #    ip4: "{{ ip_addr }}"
+    #    state: present
+    #  notify:
+    #    - reload network config
+  
+    - name: Add Docker repository
+      ansible.builtin.yum_repository:
+        name: docker-ce-stable
+        description: Docker CE stable
+        baseurl: https://download.docker.com/linux/centos/9/x86_64/stable
+        enabled: true
+        gpgcheck: 1
+        gpgkey: https://download.docker.com/linux/centos/gpg
+
+    - name: Install EPEL Repo package from standard repo
+      ansible.builtin.dnf:
+        name: epel-release
+        state: latest
+      
+    - name: Install docker packages
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: latest
+      loop:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
+        - docker-buildx-plugin
+        - docker-compose-plugin
+      notify:
+        - start docker
+
+    - name: Add user vagrant in docker group
+      ansible.builtin.user:
+        name: vagrant
+        groups: docker
+        append: yes
+    
+    - name: Create a directory for docker
+      ansible.builtin.file:
+        path: /home/vagrant/project
+        state: directory
+        owner: vagrant
+        group: vagrant
+        
+    - name: Copy all files for docker-compose and containers
+      ansible.builtin.copy:
+        src: /vagrant/ansible/files/
+        remote_src: true
+        directory_mode: true
+        dest: /home/vagrant/project
+        owner: vagrant
+        group: vagrant
+        #mode: '0755'
+#
+  handlers:
+    - name: reload network config
+      ansible.builtin.shell: nmcli connection reload
+
+    - name: start docker  
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+  
+  post_tasks:
+    - name: reset ssh connection # чтобы применились права на использование docker, необходимо перелогиниться
+      meta: reset_connection
+
+    - name: Run containers
+      shell:
+        cmd: "docker compose up -d"
+        chdir: /home/vagrant/project
+
+    

@@ -1,0 +1,50 @@
+version: '3'
+services:
+
+  mysql8master:
+    #build:
+    #  context: .
+    #  dockerfile: Dockerfile.master
+    image: mysql:8
+    container_name: mysql8master
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secret
+      MYSQL_USER: super_user
+      MYSQL_PASSWORD: secret
+      MYSQL_DATABASE: super_db
+    volumes:
+      - mysqlmaster:/var/lib/mysql
+      - ./etc/mysql-master:/etc/mysql/conf.d:ro
+      - ./share:/mnt:rw
+    networks:
+      - app-network
+    ports:
+      - "3307:3306"
+
+  mysql8slave:
+    image: mysql:8
+    container_name: mysql8slave
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secret
+    volumes:
+      - mysqlslave:/var/lib/mysql
+      - ./etc/mysql-slave:/etc/mysql/conf.d:ro
+    networks:
+      - app-network
+    ports:
+      - "3308:3306"
+    depends_on:
+      - mysql8master
+
+volumes:
+  mysqlmaster:
+    driver: local
+  mysqlslave:
+    driver: local
+  
+networks:
+  app-network:
+    driver: bridge
+

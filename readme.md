@@ -49,3 +49,9 @@
 - [VLAN, Bond](./part4/lab24)
 
 - [LDAP](./part4/lab25)
+
+- [Динамический Web](./part5/lab26)
+
+- [MySQL](./part5/lab27)
+
+- [PostgreSQL](./part5/lab28)

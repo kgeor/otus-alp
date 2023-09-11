@@ -1,0 +1,43 @@
+---
+- name: preinstall config  
+  hosts: all
+  become: true
+  tasks:
+    - name: Delete default Ethernet connection with DHCP
+      community.general.nmcli:
+        conn_name: "Wired connection 1"
+        state: absent
+    
+    - name: Add an Ethernet connection with static IP configuration
+      community.general.nmcli:
+        conn_name: enp0s8
+        ifname: enp0s8
+        type: ethernet
+        ip4: "{{ ip_addr }}"
+        state: present
+      notify: reload network config
+  handlers:
+    - name: reload network config
+      ansible.builtin.shell: nmcli connection reload
+
+#Запуск ролей install_postgres и postgres_replication на хостах node1 и node2
+- name: install postgres 14
+  hosts: node1,node2
+  become: true
+  roles:
+   - install_postgres
+
+- name: set up replication
+  hosts: node1,node2
+  tags: replication
+  become: true
+  roles:
+   - postgres_replication
+
+#Запуск роли install_barman на всех хостах
+- name: set up backup
+  hosts: all
+  tags: backup
+  become: true
+  roles:
+   - install_barman
