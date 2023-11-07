@@ -57,7 +57,7 @@ source "virtualbox-iso" "virtualbox" {
     [ "modifyvm", "{{ .Name }}", "--vram", "16"],
     [ "modifyvm", "{{ .Name }}", "--nictype1", "82545EM"]
   ]
-  vm_name               = "Rocky9-packer"
+  vm_name               = "Rocky9-image(packer)"
 }
 
 build {
@@ -80,7 +80,7 @@ build {
   }
 
   post-processor "vagrant" {
-    compression_level   = "7"
+    compression_level   = "5"
     output              = "Rocky${var.artifact_version}-x86_64-base.box"
   }
 }

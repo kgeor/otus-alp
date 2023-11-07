@@ -1,0 +1,52 @@
+---
+  - name: Add Docker repository
+    ansible.builtin.yum_repository:
+      name: docker-ce-stable
+      description: Docker CE stable
+      baseurl: https://download.docker.com/linux/centos/9/x86_64/stable
+      enabled: true
+      gpgcheck: 1
+      gpgkey: https://download.docker.com/linux/centos/gpg
+
+  - name: Install EPEL Repo package from standard repo
+    ansible.builtin.dnf:
+      name: epel-release
+      state: latest
+    
+  - name: Install docker packages
+    ansible.builtin.dnf:
+      name: "{{ item }}"
+      state: latest
+    loop:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+      # - mariadb
+      - mysql
+    notify:
+      - start docker
+
+  - name: Add user vagrant in docker group
+    ansible.builtin.user:
+      name: vagrant
+      groups: docker
+      append: yes
+  
+  - name: Create a directory for docker
+    ansible.builtin.file:
+      path: /home/vagrant/project
+      state: directory
+      owner: vagrant
+      group: vagrant
+      
+  # - name: Copy all files for docker-compose and containers
+    # ansible.builtin.copy:
+      # src: /vagrant/ansible/files/docker/
+      # remote_src: true
+      # directory_mode: true
+      # dest: /home/vagrant/project
+      # owner: vagrant
+      # group: vagrant
+      # mode: '0755'

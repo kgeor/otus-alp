@@ -1,0 +1,8 @@
+[mysqld]
+server-id = 1
+log-bin = mysql-bin
+binlog-format = row
+gtid-mode=ON
+enforce-gtid-consistency = 1
+log-replica-updates = ON
+#relay-log-info-repository = TABLE

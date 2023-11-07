@@ -1,0 +1,10 @@
+---
+- name: reload network config
+  ansible.builtin.shell: nmcli connection reload
+
+- name: start docker  
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+    

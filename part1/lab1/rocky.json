@@ -2,7 +2,7 @@
   "name": "kgeor/rocky9-kernel6",
   "versions": [
     {
-      "version": "1.5",
+      "version": "1.6",
       "providers": [
         {
           "name": "virtualbox",

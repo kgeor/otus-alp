@@ -1,0 +1,13 @@
+route:
+  group_by: ['alertname']
+  group_wait: 15s
+  group_interval: 30s
+  repeat_interval: 8h
+  receiver: blackhole
+receivers:
+- name: blackhole
+# - name: email
+#   email_configs:
+#   - to: 
+#     from: 'prom_alert@vc.miet.ru'
+#     smarthost: 

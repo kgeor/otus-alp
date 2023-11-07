@@ -1,0 +1,391 @@
+version: '3'
+services:
+
+  db1:
+    image: mysql:8.1
+    container_name: db1
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      #MYSQL_DATABASE: ${DB_NAME}
+      #MYSQL_USER: ${DB_USER}
+      #MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - ./config/mysql/my.1.cnf:/etc/mysql/conf.d/my.cnf:ro
+      - dbdata1:/var/lib/mysql
+    #command: mysqld --default-authentication-plugin=mysql_native_password
+    expose: 
+      - 3306
+    networks:
+      back:
+        ipv4_address: 172.16.5.100
+    labels:
+      service.type: "app"
+    logging:
+      # используемый драйвер логгирования
+      driver: "fluentd"
+      options:
+        # куда посылать лог-сообщения, необходимо что бы адрес 
+        # совпадал с настройками плагина forward
+        fluentd-address: localhost:${FLUENT_PORT}
+        # теги используются для маршрутизации лог-сообщений, тема 
+        # маршрутизации будет рассмотрена ниже
+    depends_on:
+      - fluent
+
+  db2:
+    image: mysql:8.1
+    container_name: db2
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      #MYSQL_DATABASE: ${DB_NAME}
+      #MYSQL_USER: ${DB_USER}
+      #MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - ./config/mysql/my.2.cnf:/etc/mysql/conf.d/my.cnf:ro
+      - dbdata2:/var/lib/mysql
+    #command: mysqld --default-authentication-plugin=mysql_native_password
+    expose: 
+      - 3306
+    networks:
+      back:
+         ipv4_address: 172.16.5.110
+    labels:
+      service.type: "app"
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:${FLUENT_PORT}
+    depends_on:
+      - fluent
+
+  haproxy:
+    # image: haproxy:2.8
+    build: ./config/haproxy
+    container_name: haproxy
+    restart: unless-stopped
+    volumes:
+      - ./config/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      # - /var/lib/haproxy/stats:/var/lib/haproxy/stats
+    expose:
+      - 3306
+      - 8405
+    networks:
+      - back
+    labels:
+      service.type: "app"
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:${FLUENT_PORT}
+    depends_on:
+      - fluent
+
+  wordpress:
+    image: wordpress:6.3.2-fpm # официальный образ от разработчиков
+    container_name: wordpress
+    restart: unless-stopped
+# на странице образа в docker hub написано, какие можно задать переменные контейнеру https://hub.docker.com/_/wordpress
+    environment:
+      WORDPRESS_DB_HOST: haproxy
+      WORDPRESS_DB_NAME: ${DB_NAME} # Также импортируем переменные из .env
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - wordpress:/var/www/html # сохраняем приложение на хост машине
+    networks:
+      - back
+    labels:
+      service.type: "app"
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:${FLUENT_PORT}
+    depends_on:
+      - fluent
+      - haproxy
+
+  nginx:
+    image: nginx:1.25.2-alpine
+    container_name: nginx
+    restart: unless-stopped
+# Т.к. все запросы к приложениям будут проходить через nginx, пробросим под каждое приложение по порту.
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+# будет использоваться php-fpm, необходимо смонтировать статические файлы wordpress :
+      - ./config/nginx:/etc/nginx/conf.d:ro # монтируем конфиг
+      - ./config/nginx/certs:/etc/nginx/certs:ro
+      - wordpress:/var/www/html # монтируем файлы wordpress
+    networks:
+      - app-network
+      - back
+    labels:
+      service.type: "app"
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:${FLUENT_PORT}
+    depends_on:
+      - fluent
+      - wordpress
+
+  fluent:
+    image: grafana/fluent-bit-plugin-loki:2.9.1-amd64 # есть еще fluent-plugin-loki (fluentd)
+    #command:
+    #  - "fluentd"
+    #  - "-v"
+    #  - "-p"
+    #  - "/fluentd/plugins"
+    environment:
+      LOKI_URL: http://loki:3100/loki/api/v1/push
+      #LOKI_USERNAME:
+      #LOKI_PASSWORD:
+    container_name: "fluent"
+    restart: unless-stopped
+    # deploy:
+      # replicas: 2
+    ports:
+     - "127.0.0.1:${FLUENT_PORT}:${FLUENT_PORT}"
+    networks:
+      - back
+    labels:
+      service.type: "service"
+    volumes:
+      - ./config/fluent/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      ## Needed for journald log ingestion:
+      # - /etc/machine-id:/etc/machine-id:ro
+      # - /run/log/journal:/run/log/journal
+      # - /dev/log:/dev/log
+      # - /var/run/systemd/journal:/var/run/systemd/journal
+    depends_on:
+      - loki
+  
+  loki:
+    image: grafana/loki:2.9.1
+    container_name: "loki"
+    restart: unless-stopped
+    #deploy:
+    #  replicas: 2
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./config/loki/loki.conf:/loki/etc/loki.conf
+    networks:
+      - back
+    labels:
+      service.type: "service"
+
+  mysql-exporter:
+    image: bitnami/mysqld-exporter:0.15.0
+    container_name: mysql-exporter
+    restart: unless-stopped
+    command: 
+      - '--config.my-cnf=/opt/.my.cnf'
+    # environment:
+    #   DATA_SOURCE_NAME: "exporter:export_metr@(db1:3306)/"
+    volumes:
+      - ./config/exporters/.my.cnf:/opt/.my.cnf:ro
+    expose:
+      - 9104
+    networks:
+      - back
+    labels:
+      service.type: "service"
+
+  # haproxy-exporter:
+  #   image: prom/haproxy-exporter:v0.15.0
+  #   container_name: haproxy-exporter
+  #   restart: unless-stopped
+  #   command:
+  #     - '--haproxy.scrape-uri="http://haproxy:8080/stats?stats;csv"'
+  #   expose:
+  #     - 9101
+  #   networks:
+  #     - back
+  #   depends_on:
+  #     - haproxy
+  #   labels:
+  #     service.type: "service"
+
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:0.11.0
+    container_name: nginx-exporter
+    restart: unless-stopped
+    environment:
+      SCRAPE_URI: "http://nginx:8080/metrics/"
+      TELEMETRY_PATH: /prom
+      NGINX_RETRIES: 10
+    expose:
+      - 9113
+    networks:
+      - back
+    depends_on:
+      - nginx
+    labels:
+      service.type: "service"
+
+  prometheus:
+    image: bitnami/prometheus:2.47.2
+    container_name: prometheus
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - ./config/prometheus:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      #- '--web.enable-admin-api'
+    expose:
+      - 9090
+    networks:
+      - back
+    labels:
+      service.type: "service"
+  
+  alertmanager:
+    image: bitnami/alertmanager:0.26.0
+    container_name: alertmanager
+    volumes:
+      - alertmanager_data:/alertmanager/data
+      - ./config/alertmanager:/etc/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    expose:
+      - 9093
+    networks:
+      - back
+    labels:
+      service.type: "service"
+
+  node-exporter:
+    image: bitnami/node-exporter:1.6.1
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro,rslave
+    command:
+      - '--path.rootfs=/rootfs'
+    expose:
+      - 9100
+    networks:
+      - back
+    labels:
+      service.type: "service"
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    restart: unless-stopped
+    # devices:
+    #   - "/dev/kmsg:/dev/kmsg"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    expose:
+      - 8080
+    networks:
+      - back
+    labels:
+      service.type: "service"
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    hostname: grafana
+    restart: unless-stopped
+    environment:
+      TZ: "Europe/Moscow"
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: pass
+      GF_USERS_ALLOW_SIGN_UP: false
+    expose:
+      - 3000
+    volumes:
+      - ./config/grafana/grafana.ini:/etc/grafana/grafana.ini
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./config/grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yaml
+      - ./config/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yaml
+      - grafana-storage:/var/lib/grafana
+    networks:
+      - back
+    labels:
+      service.type: "service"
+  
+  # mysql-backup:
+  #   image: nginx:1.25.2-alpine
+  #   container_name: mysql-backup
+  #   restart: unless-stopped
+  #   environment:
+  #     DB_DUMP_FREQ: 10
+  #     DB_DUMP_BEGIN: $(date --date="$(date)+5min" +%H%M)
+  #     DB_DUMP_TARGET: /bkp
+  #     DB_SERVER: haproxy
+  #     DB_USER: root
+  #     DB_PASS: ${DB_ROOT_PASSWORD}
+  #   volumes:
+  #     - /opt/backup/db:/bkp
+  #   networks:
+  #     - back
+  #   logging:
+  #     driver: "fluentd"
+  #     options:
+  #       fluentd-address: localhost:${FLUENT_PORT}
+  #       tag: my-bkp
+  #   depends_on:
+  #     - fluent
+  
+  # borgmatic:
+  #   image: modem7/borgmatic-docker
+  #   container_name: borgmatic
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ./config:/mnt/config:ro         # backup source
+  #     - wordpress:/mnt/wp:ro
+  #     #- dbdata1:/mnt/db:ro
+  #     - /opt/backup/borg:/mnt/borg-repository      # backup target
+  #     - ./config/borg/config:/etc/borgmatic.d  # borgmatic config file(s) + crontab.txt
+  #     - ./config/borg/state:/root/.borgmatic # borgmatic state files
+  #     - ./config/borg/keys:/root/.config/borg   # config and keyfiles
+  #     # - ${VOLUME_SSH}:/root/.ssh                   # ssh key for remote repositories
+  #     - ./config/borg/cache:/root/.cache/borg     # checksums used for deduplication
+  #   environment:
+  #       TZ: ${TZ}
+  #       BORG_PASSPHRASE: ${BORG_PASSPHRASE}
+  #       BACKUP_CRON: "*/10 * * * *"
+  #   networks:
+  #     - back
+  #   logging:
+  #     driver: "fluentd"
+  #     options:
+  #       fluentd-address: localhost:${FLUENT_PORT}
+  #   depends_on:
+  #     - fluent
+      
+volumes:
+  dbdata1:
+  dbdata2:
+  wordpress:
+  grafana-storage:
+  prometheus_data:
+  alertmanager_data:
+
+networks:
+  app-network:
+    driver: bridge
+
+  back:
+    driver: bridge
+    #internal: true
+    ipam:
+     driver: default
+     config:
+       - subnet: 172.16.5.0/24

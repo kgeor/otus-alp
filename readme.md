@@ -55,3 +55,5 @@
 - [MySQL](./part5/lab27)
 
 - [PostgreSQL](./part5/lab28)
+
+- [Проект](./project)

@@ -1,0 +1,74 @@
+groups:
+- name: all_instances
+  rules:
+  - alert: InstanceDown
+    expr: up != 1
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      description: '{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 30s.'
+      summary: Instance {{ $labels.instance }} down
+
+  - alert: HAproxyBackendServerDown
+    expr: haproxy_backend_agg_server_status{state="DOWN"} != 0
+    for: 30s
+    labels:
+      severity: warning
+    annotations:
+      description: 'One of the HAproxy backend servers {{ $labels.proxy }} of job {{ $labels.job }} has been down for more than 30s.'
+      summary: One of the HAproxy backend server {{ $labels.proxy }} down
+
+  - alert: HAproxyBackendAllDown
+    expr: haproxy_backend_status{state="DOWN"} != 0
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      description: 'HAproxy backend {{ $labels.proxy }} of job {{ $labels.job }} has been down for more than 30s.'
+      summary: All HAproxy backend {{ $labels.proxy }} down
+
+  - alert: MySQLDown
+    expr: mysql_up != 1
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      description: 'MySQL server {{ $labels.instance }} of job {{ $labels.job }} has been down for more than 30s.'
+      summary: MySQL server {{ $labels.instance }} down
+
+  - alert: MySQLReplicationError
+    expr: mysql_slave_status_slave_io_running == 0 or mysql_slave_status_slave_sql_running == 0
+    for: 1m
+    annotations:
+      description: Slave replication (IO or SQL) has been down for more than 2 minutes.
+      summary: Replication is not running
+    labels:
+      severity: warning
+
+  - alert: WordPressDown
+    expr: absent_over_time(container_last_seen{name="wordpress"}[30s])
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      description: 'WordPress server in container {{ $labels.name }} has been down for more than 30s.'
+      summary: WordPress container down
+
+  - alert: High CPU usage 
+    expr: 100 - (avg by (cpu) (rate(node_cpu_seconds_total{mode="idle"}[1m]))*100) > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU usage on instance {{$labels.instance}}"
+      description: "The CPU usage on the instance {{ $labels.instance }} has been above 90% for more than 5 minutes.\n Current value: {{ $value }}"
+
+  - alert: High RAM usage 
+    expr: node_memory_MemAvailable_bytes < node_memory_MemTotal_bytes/20
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage on instance {{ $labels.instance }}"
+      description: "The memory usage on the DB instance {{ $labels.instance }} has been above 90% for more than 5 minutes.\n Current value: {{ $value }}"

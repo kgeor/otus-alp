@@ -1,0 +1,5 @@
+---
+#- name: Reload services
+#  service:
+#    name: rsyslog
+#    state: restarted

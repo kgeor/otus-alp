@@ -1,5 +1,5 @@
 #sed -i 's/# use_devicesfile = 0/use_devicesfile = 0/' /etc/lvm/lvm.conf
-dnf -y install https://www.elrepo.org/elrepo-release-9.el9.elrepo.noarch.rpm 
+dnf -y install http://10.0.22.26/repo/elrepo-release-9.el9.elrepo.noarch.rpm #https://www.elrepo.org/elrepo-release-9.el9.elrepo.noarch.rpm 
 dnf config-manager --set-enabled elrepo-kernel
 dnf -y install kernel-lt
 #grub2-mkconfig -o /boot/grub2/grub.cfg

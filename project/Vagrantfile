@@ -1,0 +1,74 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+IP_FW = "10.0.255.1"
+IP_SERVER = "10.0.255.5"
+IP_BKP = "10.0.255.10"
+
+MACHINES = [
+  {
+    :box_name => "kgeor/rocky9-kernel6",
+    :vm_name => "fw",
+    :cpu => 1,
+    :ram => 1024,
+    :net => [
+               {adapter: 2, auto_config: false, virtualbox__intnet: "net" },
+               {adapter: 3, auto_config: false, ip: "192.168.56.10" },
+
+            ]
+  },
+  {
+    :box_name => "kgeor/rocky9-kernel6",
+    :vm_name => "docker",
+    :cpu => 6,
+    :ram => 5120,
+    :net => [
+               {adapter: 2, auto_config: false, virtualbox__intnet: "net" },
+            ]
+  }
+]
+
+Vagrant.configure(2) do |config|
+  MACHINES.each do |boxconfig|
+    if Vagrant.has_plugin?("vagrant-vbguest")
+      config.vbguest.auto_update = false
+    end
+    config.vm.define boxconfig[:vm_name] do |node|
+      node.vm.box = boxconfig[:box_name]
+      node.vm.hostname = boxconfig[:vm_name]
+      boxconfig[:net].each do |ipconf|
+        node.vm.network "private_network", **ipconf
+      end
+      node.vm.provider "virtualbox" do |vb|
+        vb.customize ["modifyvm", :id, "--memory", boxconfig[:ram]]
+        vb.customize ["modifyvm", :id, "--cpus", boxconfig[:cpu]]
+        if boxconfig[:vm_name].to_s == "docker"
+          node.vm.synced_folder "ansible/files/docker", "/home/vagrant/project"
+          unless File.exist?("disk-1.vdi")
+             vb.customize ["createmedium", "disk", "--filename", "disk-1.vdi", "--format", "vdi", "--size", "4096"]
+          end
+          vb.customize ["storageattach", :id, "--storagectl", "SATA Controller", "--port", "1", "--device", 0, "--type", "hdd", "--medium", "disk-1.vdi"]
+        end
+      end
+      node.vm.provision "ansible" do |ansible|
+        ansible.playbook = "ansible/playbook.yml"
+        ansible.host_vars = {
+          "fw" =>          { "ip_addr" => IP_FW+"/28",
+                             "ip_server" => IP_SERVER 
+                           },
+          "docker" =>      { "ip_addr" => IP_SERVER+"/28"
+                           },
+          "bkp" =>         { "ip_addr" => IP_BKP+"/28"
+                           }
+        }
+        # if boxconfig[:vm_name] == "docker"
+        #   ansible.raw_arguments = ["--tags=untagged,bkp-client"]
+        # end
+        #if boxconfig[:vm_name] == "bkp"
+        #  ansible.raw_arguments = ["--tags=untagged,bkp-server"]
+        #end
+        ansible.limit = boxconfig[:vm_name]
+        ansible.compatibility_mode = "2.0"
+      end
+    end
+  end
+end

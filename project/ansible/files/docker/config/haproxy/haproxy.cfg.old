@@ -1,0 +1,38 @@
+global
+  #log 127.0.0.1 local0
+  log stdout format raw local0 
+  maxconn 3000
+  #user haproxy
+  #group haproxy
+  #daemon
+  stats socket /var/lib/haproxy/stats
+  #stats socket /var/lib/haproxy/stats user haproxy group haproxy mode 0640 level admin expose-fd listeners
+  #tune.bufsize 32768
+  #tune.ssl.default-dh-param 2048
+  #ssl-default-bind-ciphers ALL:!aNULL:!eNULL:!EXPORT:!DES:!3DES:!MD5:!PSK:!RC4:!ADH:!LOW@STRENGTH
+
+defaults
+  log                     global
+  option                  tcplog
+  option                  redispatch
+  option                  dontlognull
+  #retries                 3
+  timeout connect         3s
+  timeout server          5s
+  timeout client          5s
+ 
+listen mysql
+  mode 	   tcp
+  bind		 *:3306
+  option	 mysql-check	user  haproxy_check
+  balance	 first
+  server	 db1	db1:3306	check  init-addr last,libc,none
+  server	 db2	db2:3306	check  init-addr last,libc,none
+
+# listen stats
+#   bind *:80
+#   mode http
+#   stats enable
+#   stats uri /stats
+#   stats realm Haproxy\ Statistics
+#   stats refresh 15s

@@ -1,0 +1,97 @@
+---
+- name: Set up common config
+  block:
+  - name: Enabling IP forwarding
+    ansible.posix.sysctl:
+      name: net.ipv4.ip_forward
+      value: '1'
+      sysctl_set: true
+      state: present
+      reload: true
+ 
+  - name: Remove LAN iface from public (WAN) zone   
+    ansible.posix.firewalld:
+      interface: enp0s8
+      zone: public
+      state: disabled
+      #permanent: true
+      immediate: true
+
+  #- name: Checking WAN iface in public (WAN) zone   
+  #  ansible.posix.firewalld:
+  #    interface: enp0s17
+  #    zone: public
+  #    state: enabled
+  #    permanent: true
+  #    immediate: true
+
+  - name: Add LAN iface to internal (LAN) zone   
+    ansible.posix.firewalld:
+      interface: enp0s8
+      zone: internal
+      state: enabled
+      #permanent: true
+      immediate: true
+    notify:
+      - save firewalld config
+      - reload network config
+  - ansible.builtin.meta: flush_handlers
+
+- name: Set up firewall config
+  #tags: fw
+  block:
+  
+  # - name: Create NAT policy
+  #   ansible.builtin.shell: |
+  #     firewall-cmd --info-policy=NAT_int_to_pub || (firewall-cmd --new-policy NAT_int_to_pub --permanent && \
+  #     firewall-cmd --permanent --policy NAT_int_to_pub --add-ingress-zone internal && \
+  #     firewall-cmd --permanent --policy NAT_int_to_pub --add-egress-zone public && \
+  #     firewall-cmd --permanent --policy NAT_int_to_pub --set-target ACCEPT)
+  #     firewall-cmd --reload
+  #   args:
+  #     executable: /bin/bash
+
+  
+  - name: Enable NAT in internal (LAN) zone
+    ansible.posix.firewalld:
+      masquerade: true
+      state: enabled
+      zone: internal
+      permanent: true
+      immediate: true
+
+  # - name: Add port forward (dst-nat) rule in public (WAN) zone
+  #   ansible.posix.firewalld:
+  #     zone: public
+  #     permanent: true
+  #     immediate: true
+  #     port_forward: 
+  #       - port: 8080
+  #         proto: tcp
+  #         toaddr: "{{ ip_server }}"
+  #         toport: 80
+  #     state: enabled
+
+  - name: Add port forward (dst-nat) rule in public (WAN) zone
+    ansible.posix.firewalld:
+      zone: public
+      permanent: true
+      immediate: true
+      port_forward: 
+        - port: 443
+          proto: tcp
+          toaddr: "{{ ip_server }}"
+          toport: 443
+      state: enabled
+
+  # - name: Add source IP in internal (LAN) zone
+    # ansible.posix.firewalld:
+      # source: 10.0.255.0/28
+      # zone: internal
+      # permanent: true
+      # immediate: true
+      # state: enabled
+      
+  notify:
+    - save firewalld config
+    - reload firewalld

@@ -1,0 +1,97 @@
+---
+# CLIENT config 
+-  name: HOST config 
+   block:
+    - name: Install packages from repo
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - borgbackup
+        - pipx
+
+    - name: Install borgmatic
+      shell: pipx ensurepath && pipx install borgmatic
+
+    - name: Create directory for borgmatic config
+      ansible.builtin.file:
+        path: /etc/borgmatic.d
+        state: directory
+
+    - name: Copy config files 
+      ansible.builtin.copy:
+        src: ./files/docker/config/borg/config/{{ item }}
+        dest: /etc/borgmatic.d/{{ item }}
+      loop:
+        - config.yaml
+        - db.yaml
+        - wp.yaml
+    
+    - name: Create a new ext4 partition for backup
+      community.general.parted:
+        device: /dev/sdb
+        label: gpt
+        number: 1
+        state: present   
+ 
+    - name: Format a new ext4 partition for backup
+      community.general.filesystem:
+        fstype: ext4
+        dev: /dev/sdb1   
+
+    - name: Mount new partition in /opt/backup
+      ansible.posix.mount:
+        path: /opt/backup
+        src: /dev/sdb1
+        fstype: ext4
+        state: mounted
+
+    - name: Check borg repo is initialized
+      ansible.builtin.shell: "[[ ! -n $(set -a && source ./.env && borg list /opt/backup/borg-repository/ 2>&1 | grep -E 'not a valid | not exist') ]]"
+      args:
+        chdir: /home/vagrant/project
+      register: beacon
+      failed_when: "beacon.rc not in [ 0, 1 ]"
+
+    - name: Initialize borg repo 
+      ansible.builtin.shell: "set -a && source ./.env && borg init --encryption=repokey-blake2 /opt/backup/borg-repository/"
+      args:
+        chdir: /home/vagrant/project
+      when: beacon.rc != 0
+    
+    - name: Copy service config 
+      ansible.builtin.copy:
+        src: "./files/docker/config/borg/{{ item }}"
+        dest: /etc/systemd/system/
+      loop:
+        - borgmatic.service
+        - borgmatic.timer
+
+    - name: Update borg passphrase in service config
+      ansible.builtin.shell: 'grep -i borg_passphrase /home/vagrant/project/.env | (read -r var; sed -i "s%BORG_PASSPHRASE=NULL%$var%g" /etc/systemd/system/borgmatic.service)'
+
+    - name: Creating directory .borgmatic for state storage
+      ansible.builtin.file:
+        path: /root/.borgmatic
+        state: directory
+  #      owner: root
+  #      group: root
+  #      mode: '0700'
+
+    - name: Start borgmatic timer also daemon-reload
+      ansible.builtin.systemd:
+        name: borgmatic.timer 
+        state: started
+        enabled: true
+        daemon_reload: true
+
+  #  - name: Copying files with owner and permissions
+  #    ansible.builtin.copy:
+  #      src: files/{{ item }}
+  #      dest: /root/.ssh/{{ item }}
+  #      owner: root
+  #      group: root
+  #      mode: '0600'
+  #    loop:
+  #      - id_ed25519
+  #      - id_ed25519.pub

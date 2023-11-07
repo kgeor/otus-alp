@@ -1,0 +1,36 @@
+source_directories:
+    - /home/vagrant/project/ansible/files/docker
+repositories:
+    - path: /opt/backup/borg-repository/
+      label: local-conf
+#one_file_system: true
+
+#storage:
+##   Passphrase is set in variable $BORG_PASSPHRASE
+##   encryption_passphrase: "DoNotMissToChangeYourPassphrase"
+#    compression: lz4
+archive_name_format: 'configs-{now:%Y-%m-%dT%H:%M:%S}'
+
+keep_hourly: 2
+keep_daily: 10
+keep_weekly: 4
+keep_monthly: 12
+
+checks:
+    - name: repository
+      frequency: 1 weeks
+    - name: archives
+      frequency: 1 days
+
+#hooks:
+loki:
+    url: http://localhost:3100/loki/api/v1/push
+    labels:
+        job: borgmatic
+before_backup:
+    - echo "Starting configs backup job."
+after_backup:
+    - echo "Conf files backup are created."
+on_error:
+    - echo "Error while creating configs backup."
+    

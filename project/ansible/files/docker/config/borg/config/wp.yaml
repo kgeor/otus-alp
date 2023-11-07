@@ -1,0 +1,35 @@
+source_directories:
+    - /var/lib/docker/volumes/project_wordpress/_data/
+repositories:
+    - path: /opt/backup/borg-repository/
+      label: local-wp
+#one_file_system: true
+
+#storage:
+##   Passphrase is set in variable $BORG_PASSPHRASE
+##   encryption_passphrase: "DoNotMissToChangeYourPassphrase"
+#    compression: lz4
+archive_name_format: 'wp-{now:%Y-%m-%dT%H:%M:%S}'
+
+keep_hourly: 4
+keep_daily: 10
+keep_weekly: 4
+keep_monthly: 12
+
+checks:
+    - name: repository
+    - name: archives
+      frequency: 2 weeks
+
+#hooks:
+loki:
+    url: http://localhost:3100/loki/api/v1/push
+    labels:
+        job: borgmatic
+before_backup:
+    - echo "Starting WordPress files backup job."
+after_backup:
+    - echo "WP backup are created."
+on_error:
+    - echo "Error while creating WP backup ."
+    

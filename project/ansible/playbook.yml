@@ -1,0 +1,200 @@
+---
+- hosts: 
+  - all
+  become: true
+
+  pre_tasks:
+    - name: Delete default Ethernet connection for adapter 2
+      community.general.nmcli:
+        conn_name: "Wired connection 1"
+        state: absent
+    
+    - name: Add Ethernet connection for adapter 2
+      community.general.nmcli:
+        conn_name: enp0s8
+        ifname: enp0s8
+        type: ethernet
+        ip4: "{{ ip_addr }}"
+        state: present
+      notify:
+        - reload network config
+    
+    - name: Set timezone
+      community.general.timezone:
+        name: Europe/Moscow
+        
+  handlers:
+    - name: reload network config
+      ansible.builtin.shell: nmcli connection reload
+
+- hosts: 
+  - fw
+  become: true
+  pre_tasks:
+    - name: Delete default Ethernet connection for adapter 3
+      community.general.nmcli:
+        conn_name: "Wired connection 2"
+        state: absent
+    
+    - name: Add Ethernet connection for adapter 3
+      community.general.nmcli:
+        conn_name: enp0s9
+        ifname: enp0s9
+        type: ethernet
+        ip4: "192.168.56.10/24"
+        state: present
+      notify:
+        - reload network config
+  handlers:
+    - name: reload network config
+      ansible.builtin.shell: nmcli connection reload
+  roles:
+    - firewall
+
+# - hosts: 
+#   - bkp
+#   become: true
+#   roles:
+#     - borg
+
+- hosts: 
+  - docker
+  become: true
+  roles:
+    - docker
+    - borg
+
+  post_tasks:
+    # - name: reset ssh connection # чтобы применились права на использование docker, необходимо перелогиниться
+    #   meta: reset_connection
+
+    # - name: Start service docker, if not started
+    #   ansible.builtin.service:
+    #     name: docker
+    #     state: started
+    - name: Check fluent-bit is installed
+      ansible.builtin.shell: "[ -f /opt/fluent-bit/bin/fluent-bit ]"
+      register: beacon
+      failed_when: "beacon.rc not in [ 0, 1 ]"
+
+    - name: Install fluent-bit
+      ansible.builtin.shell: "curl https://raw.githubusercontent.com/fluent/fluent-bit/master/install.sh | sh"
+      when: beacon.rc != 0
+
+    - name: Creating directories for fluent config and plugins
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - /etc/fluent-bit
+        - /opt/fluent-bit/plugins
+
+    - name: Copy fluent general config file
+      ansible.builtin.copy:
+        src: ./files/docker/config/fluent/fluent-bit-host.conf
+        dest: /etc/fluent-bit/fluent-bit.conf
+
+    - name: Copy fluent Loki plugin
+      ansible.builtin.copy:
+        src: ./files/docker/config/fluent/out_grafana_loki.so
+        dest: /opt/fluent-bit/plugins
+    
+    - name: Copy fluent additional config files 
+      ansible.builtin.copy:
+        src: "./files/docker/config/fluent/{{ item }}"
+        dest: /etc/fluent-bit
+      loop:
+        - plugins.conf
+        - parsers.conf
+
+    - name: Start service fluent, if not started
+      ansible.builtin.service:
+        name: fluent-bit
+        state: started
+        enabled: true
+
+    - name: Check direnv is installed
+      ansible.builtin.shell: "[ -f /usr/local/bin/direnv ]"
+      register: beacon
+      failed_when: "beacon.rc not in [ 0, 1 ]"
+
+    - name: Install direnv
+      ansible.builtin.shell: "curl -o /usr/local/bin/direnv -fL https://github.com/direnv/direnv/releases/download/v2.32.3/direnv.linux-amd64 && chmod +x /usr/local/bin/direnv"
+      when: beacon.rc != 0
+
+    - name: Create symlink for direnv
+      ansible.builtin.file:
+        src: /usr/local/bin/direnv
+        dest: /usr/local/sbin/direnv
+        state: link
+
+    - name: Add hook for direnv
+      ansible.builtin.lineinfile:
+        path: "{{ item }}"
+        line: eval "$(direnv hook bash)"
+      loop:
+        - /home/vagrant/.bashrc
+        - /root/.bashrc
+
+    - name: Add .envrc file for project and root home dirs
+      ansible.builtin.lineinfile:
+        path: "{{ item.path }}"
+        line: "{{ item.line }}"
+        create: true
+      loop:
+        - { path: '/home/vagrant/project/.envrc', line: 'export $(cat /home/vagrant/project/.env)' }
+        - { path: '/root/.envrc', line: 'export $(grep BORG_PASS /home/vagrant/project/.env)' }
+    
+    - name: Allow direnv
+      remote_user: "{{ item.user }}"
+      become: "{{ item.become }}"
+      ansible.builtin.shell: "/usr/local/bin/direnv allow"
+      args: 
+        chdir: "{{ item.path }}"
+      loop:
+        - { user: vagrant, become: false, path: /home/vagrant/project }
+        - { user: root, become: true, path: /root }
+
+    # - name: Create a directory for backups
+    #   ansible.builtin.file:
+    #     path: "{{ item }}"
+    #     state: directory
+    #     # owner: vagrant
+    #     # group: docker
+    #     # mode: '0755'
+    #   loop:
+    #     - /opt/backup/db
+    #     - /opt/backup/borg
+    
+    - name: Add LAN iface to internal (LAN) zone   
+      ansible.posix.firewalld:
+        interface: enp0s8
+        zone: internal
+        state: enabled
+        permanent: true
+        immediate: true
+
+    - name: Add port in internal (LAN) zone
+      ansible.posix.firewalld:
+        zone: internal
+        port: 80/tcp
+        permanent: true
+        immediate: true
+        state: enabled
+
+    - name: Add port in internal (LAN) zone
+      ansible.posix.firewalld:
+        zone: internal
+        port: 443/tcp
+        permanent: true
+        immediate: true
+        state: enabled
+
+    # - name: Run containers
+    #   shell: set -aeu && source ./.env && docker compose up -d
+    #   args: 
+    #     chdir: /home/vagrant/project
+    #   register: run
+    # - debug: msg="{{ run.stdout }}"
+    # - debug: msg="{{ run.stderr }}"
+    
