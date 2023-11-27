@@ -1,4 +1,7 @@
 # Загрузка системы
+1. Попасть в систему без пароля несколькими способами
+2. Установить систему с LVM, после чего переименовать VG
+3. Добавить модуль в initrd
 ## Попасть в систему без пароля
 1. **init=/bin/sh**
 
@@ -40,7 +43,7 @@
 [root@r9 ~]# sed -i 's/r1/r2/g' {/etc/fstab,/etc/default/grub,/boot/grub2/grub.cfg,/boot/loader/entries/*}
 [root@r9 ~]# dracut -f -v
 ```
-Добавим свой модуль при загрузке
+## Добавим свой модуль при загрузке
 ```
 [root@r9 ~]# mkdir /usr/lib/dracut/modules.d/01test
 [root@r9 ~]# cp /vagrant/module-setup.sh  /usr/lib/dracut/modules.d/01test/
