@@ -1,5 +1,16 @@
 # Работа с LVM
 *Работа проводилась базе чистого образа ОС Rocky Linux 9.1 с обновленным ядром*
+Задание:
+1) уменьшить том под / до 8G
+2) выделить том под /home
+3) выделить том под /var (/var - сделать в mirror)
+4) для /home - сделать том для снэпшотов
+5) прописать монтирование в fstab (попробовать с разными опциями и разными файловыми системами на выбор)
+6) Работа со снапшотами:
+- сгенерировать файлы в /home/
+- снять снэпшот
+- удалить часть файлов
+- восстановиться со снэпшота
 ## Уменьшение тома /
 Выведем доступные блочные устройства в системе
 ```
@@ -108,8 +119,6 @@ xfsrestore: Restore Status: SUCCESS
 dracut: *** Creating initramfs image file '/boot/initramfs-6.2.6-1.el9.elrepo.x86_64.img' done ***
 ```
 Перезагружаться пока не будем, продолжим работу с LVM
-
-
 ## Новый том под /var в mirror
 Сделаем отдельный новый раздел для /var
 ```
@@ -185,7 +194,6 @@ Do you really want to remove active logical volume vg_root/lv_root? [y/n]: y
 [root@lvm-l3 ~]# pvremove /dev/sdb
   Labels on physical volume "/dev/sdb" successfully wiped.
 ```
-
 ## Новый том под /home и работа со снапшотами на нем
 ```
 [root@lvm-l3 ~]# lvcreate -n home -L 2G r1
