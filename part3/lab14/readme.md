@@ -1,4 +1,11 @@
 # Настройка мониторинга. Prometheus.
+Задание:
+1) Настроить дашборд с 4-мя графиками
+- память;
+- процессор;
+- диск;
+- сеть.
+## Выполнение
 На развернутой ВМ уже установлен Prometheus NodeExporter Alertmanager и Grafana. 
 В Grafana настроен Prometheus как Data Source
 ![датасорс](./images/dsource.png)
