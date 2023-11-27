@@ -1,5 +1,18 @@
 # VLAN'ы,LACP_Строим бонды и вланы
-Схема сети
+Задание:
+1) в Office1 в тестовой подсети появляется сервера с доп интерфесами и адресами в internal сети testLAN
+- testClient1 - 10.10.10.254
+- testClient2 - 10.10.10.254
+- testServer1- 10.10.10.1
+- testServer2- 10.10.10.1
+2) развести вланами
+- testClient1 <-> testServer1
+- testClient2 <-> testServer2
+3) между centralRouter и inetRouter
+- "пробросить" 2 линка (общая inernal сеть) и объединить их в бонд
+- проверить работу c отключением интерфейсов
+
+**Схема сети**
 
 ![топология](./images/topo.png)
 ## 1. Настраиваем VLAN-ы
